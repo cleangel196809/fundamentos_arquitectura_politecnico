@@ -3,12 +3,13 @@
 Semana 4: configuración externalizada (factor III), versionada y auditable.
 Contrato: docs/CONTRATOS.md (P08) y contracts/endpoints.json.
 """
+import json
 import socket
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Path, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Path, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -72,21 +73,55 @@ def _repo() -> Repositorio:
     return ESTADO["repo"]
 
 
+def _etag_para(version: int) -> str:
+    return f'"v{version}"'
+
+
+def _coincide_etag(if_none_match: str | None, etag: str) -> bool:
+    if not if_none_match:
+        return False
+    candidatos = [t.strip() for t in if_none_match.split(",")]
+    desnudo = etag.strip('"')
+    return "*" in candidatos or etag in candidatos or f"W/{etag}" in candidatos or desnudo in candidatos
+
+
 AppNombre = Path(pattern=APP_PATRON, description="Nombre del servicio, p. ej. catalogo-service")
 Entorno = Path(pattern=ENV_PATRON, description="dev | qa | stg | prod")
 
 
 # ---------- API de configuración ----------
-@app.get("/config/{app_name}/{env}", tags=["config"])
-async def obtener(app_name: str = AppNombre, env: str = Entorno) -> dict[str, Any]:
-    fila = await _repo().actual(app_name, env)
-    if fila is None:
-        raise _error(404, f"No hay configuración para {app_name}/{env}", "CONFIG_NO_ENCONTRADA")
+@app.get("/config/{app_name}/{env}", tags=["config"], response_model=None)
+async def obtener(
+    response: Response,
+    app_name: str = AppNombre,
+    env: str = Entorno,
+    version: int | None = Query(default=None, ge=1, description="Versión histórica específica"),
+    if_none_match: str | None = Header(default=None),
+) -> Response | dict[str, Any]:
+    if version is not None:
+        fila = await _repo().obtener(app_name, env, version)
+        if fila is None:
+            raise _error(
+                404,
+                f"No existe la versión {version} para {app_name}/{env}",
+                "VERSION_NO_ENCONTRADA",
+            )
+    else:
+        fila = await _repo().actual(app_name, env)
+        if fila is None:
+            raise _error(404, f"No hay configuración para {app_name}/{env}", "CONFIG_NO_ENCONTRADA")
+
+    etag = _etag_para(fila.version)
+    if _coincide_etag(if_none_match, etag):
+        return Response(status_code=304, headers={"ETag": etag})
+
+    response.headers["ETag"] = etag
     return fila.a_dict()
 
 
 @app.put("/config/{app_name}/{env}", tags=["config"], status_code=201)
 async def publicar(
+    response: Response,
     cuerpo: Publicacion,
     app_name: str = AppNombre,
     env: str = Entorno,
@@ -94,6 +129,7 @@ async def publicar(
 ) -> dict[str, Any]:
     fila = await _repo().publicar(app_name, env, cuerpo.data, x_autor, cuerpo.motivo)
     ESTADO["config_version"] = max(int(ESTADO["config_version"]), fila.version)
+    response.headers["ETag"] = _etag_para(fila.version)
     return fila.a_dict()
 
 
@@ -103,6 +139,34 @@ async def historial(app_name: str = AppNombre, env: str = Entorno) -> list[dict[
     if not filas:
         raise _error(404, f"No hay historial para {app_name}/{env}", "CONFIG_NO_ENCONTRADA")
     return [f.a_dict(con_data=False) for f in filas]
+
+
+@app.post("/config/{app_name}/{env}/rollback/{version}", tags=["config"], status_code=201)
+async def rollback(
+    response: Response,
+    app_name: str = AppNombre,
+    env: str = Entorno,
+    version: int = Path(ge=1, description="Versión histórica a restaurar"),
+    x_autor: str = Header(default="sistema-rollback"),
+) -> dict[str, Any]:
+    objetivo = await _repo().obtener(app_name, env, version)
+    if objetivo is None:
+        raise _error(
+            404,
+            f"No existe la versión {version} para revertir en {app_name}/{env}",
+            "VERSION_NO_ENCONTRADA",
+        )
+    autor = (x_autor or "").strip() or "sistema-rollback"
+    nueva = await _repo().publicar(
+        app_name,
+        env,
+        json.loads(objetivo.data_json),
+        autor=autor,
+        motivo=f"rollback a v{version}",
+    )
+    ESTADO["config_version"] = max(int(ESTADO["config_version"]), nueva.version)
+    response.headers["ETag"] = _etag_para(nueva.version)
+    return nueva.a_dict()
 
 
 # ---------- sondas de salud (semántica diferenciada) ----------
