@@ -32,7 +32,12 @@ class Publicacion(BaseModel):
     """Cuerpo de PUT /config/{app}/{env}."""
 
     data: dict[str, Valor] = Field(description="Parámetros planos clave → valor (sin secretos)")
-    motivo: str = Field(min_length=3, max_length=256, description="Por qué se cambia (auditoría)")
+    motivo: str = Field(
+        default="actualización de configuración",
+        min_length=3,
+        max_length=256,
+        description="Por qué se cambia (auditoría)",
+    )
 
 
 @asynccontextmanager
@@ -85,6 +90,17 @@ def _coincide_etag(if_none_match: str | None, etag: str) -> bool:
     return "*" in candidatos or etag in candidatos or f"W/{etag}" in candidatos or desnudo in candidatos
 
 
+def _validar_escritura(x_autor: str, x_write_token: str | None) -> str:
+    """Verifica autoría obligatoria (X-Autor) y token opcional de escritura."""
+    autor = (x_autor or "").strip()
+    if not autor:
+        raise _error(422, "La cabecera X-Autor no puede estar vacía", "AUTOR_VACIO")
+    esperado = get_settings().write_token.get_secret_value()
+    if esperado and x_write_token != esperado:
+        raise _error(401, "Token de escritura inválido o ausente", "NO_AUTORIZADO")
+    return autor
+
+
 AppNombre = Path(pattern=APP_PATRON, description="Nombre del servicio, p. ej. catalogo-service")
 Entorno = Path(pattern=ENV_PATRON, description="dev | qa | stg | prod")
 
@@ -125,9 +141,11 @@ async def publicar(
     cuerpo: Publicacion,
     app_name: str = AppNombre,
     env: str = Entorno,
-    x_autor: str = Header(default="anonimo"),
+    x_autor: str = Header(..., min_length=2, max_length=64, description="Autor del cambio (auditoría)"),
+    x_write_token: str | None = Header(default=None, include_in_schema=False),
 ) -> dict[str, Any]:
-    fila = await _repo().publicar(app_name, env, cuerpo.data, x_autor, cuerpo.motivo)
+    autor = _validar_escritura(x_autor, x_write_token)
+    fila = await _repo().publicar(app_name, env, cuerpo.data, autor, cuerpo.motivo)
     ESTADO["config_version"] = max(int(ESTADO["config_version"]), fila.version)
     response.headers["ETag"] = _etag_para(fila.version)
     return fila.a_dict()
@@ -147,8 +165,10 @@ async def rollback(
     app_name: str = AppNombre,
     env: str = Entorno,
     version: int = Path(ge=1, description="Versión histórica a restaurar"),
-    x_autor: str = Header(default="sistema-rollback"),
+    x_autor: str = Header(default="sistema-rollback", max_length=64),
+    x_write_token: str | None = Header(default=None, include_in_schema=False),
 ) -> dict[str, Any]:
+    autor = _validar_escritura(x_autor or "sistema-rollback", x_write_token)
     objetivo = await _repo().obtener(app_name, env, version)
     if objetivo is None:
         raise _error(
@@ -156,7 +176,6 @@ async def rollback(
             f"No existe la versión {version} para revertir en {app_name}/{env}",
             "VERSION_NO_ENCONTRADA",
         )
-    autor = (x_autor or "").strip() or "sistema-rollback"
     nueva = await _repo().publicar(
         app_name,
         env,

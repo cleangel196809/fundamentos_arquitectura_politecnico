@@ -37,5 +37,5 @@ def test_entornos_y_apps_son_independientes(client):
 
 def test_validacion_422(client):
     assert client.get("/config/catalogo-service/produccion").status_code == 422
-    r = client.put("/config/catalogo-service/dev", json={"data": {"a": 1}}, headers={"X-Autor": "x"})
+    r = client.put("/config/catalogo-service/dev", json={"data": {"a": 1}, "motivo": "x"}, headers={"X-Autor": "ana"})
     assert r.status_code == 422 and r.json()["codigo"] == "VALIDACION"
