@@ -3,12 +3,14 @@
 Semana 4: configuración externalizada (factor III), versionada y auditable.
 Contrato: docs/CONTRATOS.md (P08) y contracts/endpoints.json.
 """
+from __future__ import annotations
+
 import json
 import socket
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 from fastapi import FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -27,7 +29,7 @@ ESTADO: dict[str, Any] = {"arranco": False, "config_version": 0, "repo": None}
 
 ENV_PATRON = "^(dev|qa|stg|prod)$"
 APP_PATRON = "^[a-z][a-z0-9-]{1,63}$"
-Valor = str | int | float | bool | None
+Valor = Union[str, int, float, bool, None]
 
 
 class Publicacion(BaseModel):
