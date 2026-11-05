@@ -1,1 +1,252 @@
-{}
+{
+  "catalogo-service": {
+    "dev": {
+      "pagina_tamano": 20,
+      "timeout_inventario_s": 3.0,
+      "cache_ttl_s": 30,
+      "flag_promos_navidad": true,
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "pagina_tamano": 25,
+      "timeout_inventario_s": 2.5,
+      "cache_ttl_s": 60,
+      "flag_promos_navidad": true,
+      "log_level": "INFO"
+    },
+    "stg": {
+      "pagina_tamano": 40,
+      "timeout_inventario_s": 2.0,
+      "cache_ttl_s": 120,
+      "flag_promos_navidad": false,
+      "log_level": "INFO"
+    },
+    "prod": {
+      "pagina_tamano": 50,
+      "timeout_inventario_s": 1.5,
+      "cache_ttl_s": 300,
+      "flag_promos_navidad": true,
+      "log_level": "INFO"
+    }
+  },
+  "inventario-service": {
+    "dev": {
+      "reserva_ttl_s": 600,
+      "stock_minimo_alerta": 5,
+      "max_unidades_por_reserva": 100,
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "reserva_ttl_s": 450,
+      "stock_minimo_alerta": 10,
+      "max_unidades_por_reserva": 100,
+      "log_level": "INFO"
+    },
+    "stg": {
+      "reserva_ttl_s": 300,
+      "stock_minimo_alerta": 15,
+      "max_unidades_por_reserva": 50,
+      "log_level": "INFO"
+    },
+    "prod": {
+      "reserva_ttl_s": 300,
+      "stock_minimo_alerta": 20,
+      "max_unidades_por_reserva": 50,
+      "log_level": "INFO"
+    }
+  },
+  "pedidos-service": {
+    "dev": {
+      "outbox_batch_size": 20,
+      "outbox_interval_s": 2.0,
+      "stream_nombre": "pishop.pedidos",
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "outbox_batch_size": 50,
+      "outbox_interval_s": 1.5,
+      "stream_nombre": "pishop.pedidos",
+      "log_level": "INFO"
+    },
+    "stg": {
+      "outbox_batch_size": 100,
+      "outbox_interval_s": 1.0,
+      "stream_nombre": "pishop.pedidos",
+      "log_level": "INFO"
+    },
+    "prod": {
+      "outbox_batch_size": 100,
+      "outbox_interval_s": 1.0,
+      "stream_nombre": "pishop.pedidos",
+      "log_level": "INFO"
+    }
+  },
+  "pagos-service": {
+    "dev": {
+      "http_timeout_seconds": 3.0,
+      "pasarela_modo": "ok",
+      "reintentos_max": 1,
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "http_timeout_seconds": 2.5,
+      "pasarela_modo": "ok",
+      "reintentos_max": 2,
+      "log_level": "INFO"
+    },
+    "stg": {
+      "http_timeout_seconds": 2.0,
+      "pasarela_modo": "ok",
+      "reintentos_max": 2,
+      "log_level": "INFO"
+    },
+    "prod": {
+      "http_timeout_seconds": 2.0,
+      "pasarela_modo": "ok",
+      "reintentos_max": 2,
+      "log_level": "INFO"
+    }
+  },
+  "notificaciones-service": {
+    "dev": {
+      "consumer_group": "notificaciones",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 10,
+      "poll_ms": 500,
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "consumer_group": "notificaciones",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 25,
+      "poll_ms": 500,
+      "log_level": "INFO"
+    },
+    "stg": {
+      "consumer_group": "notificaciones",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 50,
+      "poll_ms": 250,
+      "log_level": "INFO"
+    },
+    "prod": {
+      "consumer_group": "notificaciones",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 50,
+      "poll_ms": 250,
+      "log_level": "INFO"
+    }
+  },
+  "checkout-bff": {
+    "dev": {
+      "timeout_catalogo_s": 2.0,
+      "timeout_inventario_s": 2.0,
+      "timeout_pedidos_s": 2.5,
+      "timeout_pagos_s": 3.0,
+      "vitrina_limite": 20,
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "timeout_catalogo_s": 1.8,
+      "timeout_inventario_s": 1.8,
+      "timeout_pedidos_s": 2.0,
+      "timeout_pagos_s": 2.5,
+      "vitrina_limite": 20,
+      "log_level": "INFO"
+    },
+    "stg": {
+      "timeout_catalogo_s": 1.5,
+      "timeout_inventario_s": 1.5,
+      "timeout_pedidos_s": 2.0,
+      "timeout_pagos_s": 2.5,
+      "vitrina_limite": 30,
+      "log_level": "INFO"
+    },
+    "prod": {
+      "timeout_catalogo_s": 1.2,
+      "timeout_inventario_s": 1.5,
+      "timeout_pedidos_s": 1.8,
+      "timeout_pagos_s": 2.0,
+      "vitrina_limite": 40,
+      "log_level": "INFO"
+    }
+  },
+  "api-publica": {
+    "dev": {
+      "rate_limit_por_minuto": 120,
+      "timeout_bff_s": 4.0,
+      "timeout_catalogo_s": 2.0,
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "rate_limit_por_minuto": 60,
+      "timeout_bff_s": 3.5,
+      "timeout_catalogo_s": 1.8,
+      "log_level": "INFO"
+    },
+    "stg": {
+      "rate_limit_por_minuto": 60,
+      "timeout_bff_s": 3.0,
+      "timeout_catalogo_s": 1.5,
+      "log_level": "INFO"
+    },
+    "prod": {
+      "rate_limit_por_minuto": 60,
+      "timeout_bff_s": 3.0,
+      "timeout_catalogo_s": 1.2,
+      "log_level": "INFO"
+    }
+  },
+  "reportes-service": {
+    "dev": {
+      "consumer_group": "reportes",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 25,
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "consumer_group": "reportes",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 50,
+      "log_level": "INFO"
+    },
+    "stg": {
+      "consumer_group": "reportes",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 100,
+      "log_level": "INFO"
+    },
+    "prod": {
+      "consumer_group": "reportes",
+      "stream_nombre": "pishop.pedidos",
+      "batch_size": 100,
+      "log_level": "INFO"
+    }
+  },
+  "descubridor-service": {
+    "dev": {
+      "cache_instancias_ttl_s": 5,
+      "timeout_consul_s": 2.0,
+      "estrategia_balanceo": "round-robin",
+      "log_level": "DEBUG"
+    },
+    "qa": {
+      "cache_instancias_ttl_s": 5,
+      "timeout_consul_s": 1.5,
+      "estrategia_balanceo": "round-robin",
+      "log_level": "INFO"
+    },
+    "stg": {
+      "cache_instancias_ttl_s": 3,
+      "timeout_consul_s": 1.5,
+      "estrategia_balanceo": "round-robin",
+      "log_level": "INFO"
+    },
+    "prod": {
+      "cache_instancias_ttl_s": 3,
+      "timeout_consul_s": 1.0,
+      "estrategia_balanceo": "round-robin",
+      "log_level": "INFO"
+    }
+  }
+}

@@ -7,9 +7,10 @@ import json
 import socket
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Path, Query, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -20,6 +21,7 @@ from app.store import Repositorio
 settings = get_settings()
 INSTANCE_ID = f"{settings.service_name}-{uuid.uuid4().hex[:5]}"
 HOST = socket.gethostname()
+RUTA_SEED_POR_DEFECTO = Path(__file__).resolve().parent.parent / "seed.json"
 
 ESTADO: dict[str, Any] = {"arranco": False, "config_version": 0, "repo": None}
 
@@ -40,11 +42,39 @@ class Publicacion(BaseModel):
     )
 
 
+async def cargar_semilla(repo: Repositorio, seed_path: str) -> int:
+    """Siembra configuraciones iniciales desde seed.json sin pisar versiones existentes."""
+    ruta = Path(seed_path) if seed_path else RUTA_SEED_POR_DEFECTO
+    if not ruta.exists():
+        return 0
+    contenido = json.loads(ruta.read_text(encoding="utf-8") or "{}")
+    if not isinstance(contenido, dict):
+        return 0
+    sembradas = 0
+    for app_name, por_entorno in contenido.items():
+        if not isinstance(por_entorno, dict):
+            continue
+        for env, valores in por_entorno.items():
+            if not isinstance(valores, dict):
+                continue
+            if await repo.actual(app_name, env) is None:
+                await repo.publicar(
+                    app_name,
+                    env,
+                    valores,
+                    autor="seed",
+                    motivo="semilla inicial seed.json",
+                )
+                sembradas += 1
+    return sembradas
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
     repo = Repositorio(s.database_url)
     await repo.crear_esquema()
+    await cargar_semilla(repo, s.seed_path)
     ESTADO["repo"] = repo
     ESTADO["config_version"] = 1
     ESTADO["arranco"] = True
@@ -101,8 +131,8 @@ def _validar_escritura(x_autor: str, x_write_token: str | None) -> str:
     return autor
 
 
-AppNombre = Path(pattern=APP_PATRON, description="Nombre del servicio, p. ej. catalogo-service")
-Entorno = Path(pattern=ENV_PATRON, description="dev | qa | stg | prod")
+AppNombre = PathParam(pattern=APP_PATRON, description="Nombre del servicio, p. ej. catalogo-service")
+Entorno = PathParam(pattern=ENV_PATRON, description="dev | qa | stg | prod")
 
 
 # ---------- API de configuración ----------
@@ -164,7 +194,7 @@ async def rollback(
     response: Response,
     app_name: str = AppNombre,
     env: str = Entorno,
-    version: int = Path(ge=1, description="Versión histórica a restaurar"),
+    version: int = PathParam(ge=1, description="Versión histórica a restaurar"),
     x_autor: str = Header(default="sistema-rollback", max_length=64),
     x_write_token: str | None = Header(default=None, include_in_schema=False),
 ) -> dict[str, Any]:
