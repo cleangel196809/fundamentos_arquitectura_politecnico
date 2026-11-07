@@ -83,11 +83,11 @@ services:
   checkout-bff:
     <<: *servicio
     build: ./services/checkout-bff
-    ports: ["8081:8080"]
+    ports: ["8080:8080"]
     environment: {<<: *env, PISHOP_SERVICE_NAME: checkout-bff, PISHOP_HTTP_PORT: "8080"}
 
   api-publica:
     <<: *servicio
     build: ./services/api-publica
     ports: ["8000:8000"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: api-publica, PISHOP_HTTP_PORT: "8000", PISHOP_API_KEY: "${PISHOP_API_KEY:?defina PISHOP_API_KEY en .env}"}
+    environment: {<<: *env, PISHOP_SERVICE_NAME: api-publica, PISHOP_HTTP_PORT: "8000", PISHOP_API_KEY: ${PISHOP_API_KEY:?defina PISHOP_API_KEY en .env}}
