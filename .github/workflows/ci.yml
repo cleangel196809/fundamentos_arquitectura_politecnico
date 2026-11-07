@@ -1,31 +1,67 @@
-name: ci
+# =============================================================================
+# CI de PiShop Cloud (P12 - Danixa Herrera)
+# CI = Integracion Continua: GitHub revisa el proyecto automaticamente.
+# Resultado: palomita verde = todo bien; X roja = algo fallo.
+# Se ve en la pestana "Actions" del repositorio y dentro de cada Pull Request.
+# =============================================================================
+name: ci                          # nombre que aparece en GitHub
 
-on:
-  pull_request:
+on:                               # CUANDO se ejecuta:
+  pull_request:                   #   cada vez que alguien abre o actualiza un Pull Request
   push:
-    branches: [main]
+    branches: [main]              #   y cada vez que algo llega a la rama main
 
-jobs:
-  validar:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-      - run: pip install -r plantilla-servicio/requirements.txt
+jobs:                             # lista de trabajos (aqui solo hay uno)
+  validar:                        # nombre del trabajo
+    runs-on: ubuntu-latest        # GitHub presta una computadora Linux limpia en la nube
+    steps:                        # los pasos, en orden; si uno falla, el CI queda en rojo
+
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4                 # copia el proyecto a esa computadora
+
+      - name: Instalar Python 3.13
+        uses: actions/setup-python@v5             # instala Python
+        with: {python-version: "3.13"}            # la version del curso
+
+      - name: Instalar dependencias base
+        run: pip install -r plantilla-servicio/requirements.txt   # fastapi, pytest, etc.
+
       - name: Pruebas de la plantilla
-        run: cd plantilla-servicio && python -m pytest -q
-      - name: Pruebas de cada servicio implementado
+        run: cd plantilla-servicio && python -m pytest -q          # la plantilla del profe debe seguir funcionando
+
+      - name: Pruebas de mis herramientas (P12)
+        run: python -m pytest pruebas_p12 -q
+      # pytest POR SERVICIO (lo que pide el punto 4).
+      # Entra a cada services/<nombre>/ que tenga pruebas, instala sus dependencias
+      # y corre sus pruebas. Si uno falla, sigue con los demas y al final dice cuales fallaron.
+      - name: Pruebas de cada servicio (pytest por servicio)
         run: |
-          for d in services/*; do
-            [ -d "$d/tests" ] || continue
-            echo "== $d"
-            pip install httpx<0.28 fastapi pytest sqlalchemy
-            if [ -f "$d/requirements.txt" ]; then
-              pip install -r "$d/requirements.txt"
-            fi
-            (cd "$d" && python -m pytest -q) || exit 1
+          fallaron=""                                          # lista vacia de servicios que fallan
+          for d in services/*/; do                             # por cada carpeta dentro de services/
+            [ -d "$d/tests" ] || continue                      # si no tiene carpeta tests, saltarla
+            echo "::group::pytest $d"                          # agrupa la salida en GitHub (se ve ordenado)
+            [ -f "$d/requirements.txt" ] && pip install -q -r "$d/requirements.txt"   # sus dependencias propias
+            (cd "$d" && python -m pytest -q) || fallaron="$fallaron $d"               # corre pytest; si falla, lo anota
+            echo "::endgroup::"
           done
-      - name: Validar contratos (informativo hasta el cierre)
+          if [ -n "$fallaron" ]; then                          # si la lista no quedo vacia...
+            echo "Servicios con pruebas fallidas:$fallaron"
+            exit 1                                             # ...el CI queda en rojo
+          fi
+          echo "Todas las pruebas de servicios pasaron"
+
+      - name: Auditar configuracion embebida (criterio 1 del reto 4.1)
+        run: python herramientas/auditar_config.py             # mi punto 5: rojo si hay claves o IPs en el codigo
+
+      - name: Analisis de disponibilidad (reto 3.1)
+        run: python retos/semana03/disponibilidad.py           # mi punto 1: comprueba que el script corre
+
+      - name: Revisar que docker-compose.yml este bien escrito
+        run: cp .env.example .env && docker compose config -q  # mi punto 2: crea un .env de prueba y revisa el compose
+
+      # Contratos de los 10 servicios (lo que pide el punto 4).
+      # "|| true" = informativo hasta el cierre (decision del docente): muestra que falta,
+      # pero no pone el CI en rojo mientras los companeros terminan.
+      - name: Validar contratos de todos los servicios (validar_entrega.py --todos)
         run: python herramientas/validar_entrega.py --todos || true
+

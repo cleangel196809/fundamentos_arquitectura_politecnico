@@ -1,93 +1,194 @@
-# Entorno completo de PiShop Cloud. P12 es responsable de mantenerlo funcionando.
-# Cada servicio de services/<nombre>/ debe tener su Dockerfile (copiado de plantilla-servicio/).
-# Uso:  docker compose up -d        (levanta infraestructura y los servicios implementados)
+# =============================================================================
+# docker-compose.yml de PiShop Cloud
+# Responsable: P12 (Danixa Herrera). Prende los 13 programas con un comando.
+#
+# Como se usa:
+#   1. copy .env.example .env        crea el .env con las claves (NO se sube a GitHub)
+#   2. docker compose up -d          prende todo (-d = en segundo plano)
+#   3. docker compose ps             muestra el estado; "healthy" = sano
+#   4. docker compose down           apaga todo (con -v borra tambien los datos)
+
+# -----------------------------------------------------------------------------
+# BLOQUES REUTILIZABLES: se escriben una vez y se usan en muchos servicios
+# -----------------------------------------------------------------------------
+
+# Datos que reciben TODOS los servicios al arrancar (llenan los espacios de su settings.py).
+x-env-comun: &env-comun
+  PISHOP_APP_ENV: dev                                     # ambiente: dev = pruebas (otros: qa, stg, prod)
+  PISHOP_CONSUL_URL: http://consul:8500                   # donde esta Consul, el directorio de servicios
+  PISHOP_CONFIG_SERVICE_URL: http://config-service:8010   # donde pedir la configuracion (servicio de P08)
+  PISHOP_EVENT_BUS: redis                                 # por donde se mandan los avisos: por Redis
+  PISHOP_REDIS_URL: redis://redis:6379/0                  # donde esta Redis
+  PISHOP_HTTP_TIMEOUT_SECONDS: "2.0"                      # maximo 2 s esperando a otro servicio (semana 3)
+
+# Sonda de salud: Docker le "toma el pulso" a cada servicio (semana 4).
+x-sonda: &sonda
+  # Comando que se ejecuta DENTRO del contenedor: Python abre /health/ready del mismo servicio.
+  # Si responde 200 = sano; si responde 503 o no contesta = cuenta un fallo.
+  test: ["CMD", "python", "-c", "import os,urllib.request; urllib.request.urlopen('http://localhost:' + os.environ['PISHOP_HTTP_PORT'] + '/health/ready', timeout=2)"]
+  interval: 10s        # repite la prueba cada 10 segundos
+  timeout: 3s          # si tarda mas de 3 segundos, cuenta como fallo
+  retries: 5           # 5 fallos seguidos = "unhealthy" (enfermo)
+  start_period: 15s    # los primeros 15 s no cuentan: le da tiempo de arrancar
+
+# Molde 1: servicio SIN base de datos (config, descubridor, checkout, api-publica).
 x-servicio: &servicio
-  restart: unless-stopped
-  environment: &env
-    PISHOP_APP_ENV: dev
-    PISHOP_CONSUL_URL: http://consul:8500
-    PISHOP_CONFIG_SERVICE_URL: http://config-service:8010
-    PISHOP_EVENT_BUS: redis
-    PISHOP_REDIS_URL: redis://redis:6379/0
-  depends_on:
+  restart: unless-stopped            # si se cae, Docker lo vuelve a prender solo
+  healthcheck: *sonda                # usa la sonda de arriba
+  depends_on:                        # "depende de": no arranca hasta que estos esten sanos
     consul: {condition: service_healthy}
     redis: {condition: service_healthy}
 
-services:
-  consul:
-    image: hashicorp/consul:1.21
-    command: agent -server -bootstrap -ui -client=0.0.0.0
-    ports: ["8500:8500"]
-    healthcheck: {test: ["CMD", "consul", "members"], interval: 5s, retries: 10}
+# Molde 2: servicio CON base de datos propia (catalogo, inventario, pedidos, pagos, notificaciones, reportes).
+x-servicio-con-bd: &servicio-con-bd
+  restart: unless-stopped
+  healthcheck: *sonda
+  depends_on:
+    consul: {condition: service_healthy}
+    redis: {condition: service_healthy}
+    postgres: {condition: service_healthy}   # ademas espera a que la base de datos este lista
 
-  redis:
+
+services:
+  consul:                                         # directorio: cada servicio se registra aqui
+    image: hashicorp/consul:1.21                  # programa ya hecho que se descarga de internet
+    command: agent -server -bootstrap -ui -client=0.0.0.0   # arranca Consul con su pagina web
+    ports: ["8500:8500"]                          # puerto de mi PC : puerto de la caja -> localhost:8500
+    healthcheck: {test: ["CMD", "consul", "members"], interval: 5s, retries: 10}   # su propia sonda
+
+  redis:                                          # buzon de mensajes entre servicios
     image: redis:8-alpine
     ports: ["6379:6379"]
-    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10}
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10}   # "ping" -> "PONG" = sano
 
-  postgres:
+  postgres:                                       # base de datos
     image: postgres:17-alpine
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD en .env}
-    volumes: ["./infra/initdb:/docker-entrypoint-initdb.d:ro"]   # crea pg_catalogo, pg_inventario, pg_pedidos, pg_pagos, pg_notif, pg_reportes
-    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 10}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD en .env}   # la clave sale del .env; si no hay, avisa y no arranca
+    volumes:
+      - ./infra/initdb:/docker-entrypoint-initdb.d:ro   # script del profe que crea las 6 bases (una por servicio)
+      - pgdata:/var/lib/postgresql/data                  # guarda los datos en el volumen: no se borran al apagar
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 10}   # "estas lista?"
 
-  config-service:
-    <<: *servicio
-    build: ./services/config-service
+
+  config-service:                                 # P08: entrega la configuracion a los demas
+    <<: *servicio                                 # usa el molde SIN base
+    build: ./services/config-service              # construye la caja con el codigo de esa carpeta
     ports: ["8010:8010"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: config-service, PISHOP_HTTP_PORT: "8010"}
+    environment:
+      <<: *env-comun                              # los 6 datos comunes
+      PISHOP_SERVICE_NAME: config-service         # como se llama
+      PISHOP_HTTP_PORT: "8010"                    # en que puerto escucha
 
-  catalogo-service:
-    <<: *servicio
-    build: ./services/catalogo-service
-    ports: ["8001:8001"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: catalogo-service, PISHOP_HTTP_PORT: "8001"}
-
-  inventario-service:
-    <<: *servicio
-    build: ./services/inventario-service
-    ports: ["8002:8002"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: inventario-service, PISHOP_HTTP_PORT: "8002"}
-
-  pedidos-service:
-    <<: *servicio
-    build: ./services/pedidos-service
-    ports: ["8003:8003"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: pedidos-service, PISHOP_HTTP_PORT: "8003"}
-
-  pagos-service:
-    <<: *servicio
-    build: ./services/pagos-service
-    ports: ["8004:8004"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: pagos-service, PISHOP_HTTP_PORT: "8004", PISHOP_PASARELA_MODO: ok}
-
-  notificaciones-service:
-    <<: *servicio
-    build: ./services/notificaciones-service
-    ports: ["8005:8005"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: notificaciones-service, PISHOP_HTTP_PORT: "8005"}
-
-  reportes-service:
-    <<: *servicio
-    build: ./services/reportes-service
-    ports: ["8006:8006"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: reportes-service, PISHOP_HTTP_PORT: "8006"}
-
-  descubridor-service:
+  descubridor-service:                            # P09: consulta a Consul quien esta sano
     <<: *servicio
     build: ./services/descubridor-service
     ports: ["8090:8090"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: descubridor-service, PISHOP_HTTP_PORT: "8090"}
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: descubridor-service
+      PISHOP_HTTP_PORT: "8090"
 
-  checkout-bff:
-    <<: *servicio
+  # ======================= CORE, cada uno con SU base (6) =======================
+  # Formato de la direccion de la base:
+  #   postgresql+asyncpg://USUARIO:CLAVE@MAQUINA:PUERTO/BASE
+  #   la CLAVE es ${POSTGRES_PASSWORD} (se llena con el .env) y la MAQUINA se llama por nombre: postgres
+
+  catalogo-service:                               # P01: productos
+    <<: *servicio-con-bd                          # usa el molde CON base
+    build: ./services/catalogo-service
+    ports: ["8001:8001"]
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: catalogo-service
+      PISHOP_HTTP_PORT: "8001"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/pg_catalogo   # SU base
+      PISHOP_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}                                                       # su clave, desde el .env
+
+  inventario-service:                             # P02: stock y reservas
+    <<: *servicio-con-bd
+    build: ./services/inventario-service
+    ports: ["8002:8002"]
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: inventario-service
+      PISHOP_HTTP_PORT: "8002"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/pg_inventario
+      PISHOP_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+
+  pedidos-service:                                # P03: pedidos + outbox
+    <<: *servicio-con-bd
+    build: ./services/pedidos-service
+    ports: ["8003:8003"]
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: pedidos-service
+      PISHOP_HTTP_PORT: "8003"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/pg_pedidos
+      PISHOP_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+
+  pagos-service:                                  # P04: pagos + pasarela simulada
+    <<: *servicio-con-bd
+    build: ./services/pagos-service
+    ports: ["8004:8004"]
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: pagos-service
+      PISHOP_HTTP_PORT: "8004"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/pg_pagos
+      PISHOP_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      PISHOP_PASARELA_MODO: ${PISHOP_PASARELA_MODO:-ok}   # modo desde afuera: ok | rechaza | lenta | falla (si no dicen nada: ok)
+
+  notificaciones-service:                         # P05: avisos al cliente
+    <<: *servicio-con-bd
+    build: ./services/notificaciones-service
+    ports: ["8005:8005"]
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: notificaciones-service
+      PISHOP_HTTP_PORT: "8005"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/pg_notif
+      PISHOP_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+
+  reportes-service:                               # P10: reportes de ventas
+    <<: *servicio-con-bd
+    build: ./services/reportes-service
+    ports: ["8006:8006"]
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: reportes-service
+      PISHOP_HTTP_PORT: "8006"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/pg_reportes
+      PISHOP_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+
+  # ======================= COMPUESTO Y PUERTA DE ENTRADA (2) =======================
+
+  checkout-bff:                                   # P06: coordina la compra (saga)
+    <<: *servicio                                 # sin base propia
     build: ./services/checkout-bff
     ports: ["8080:8080"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: checkout-bff, PISHOP_HTTP_PORT: "8080"}
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: checkout-bff
+      PISHOP_HTTP_PORT: "8080"
+      # A quien llama durante la compra (por NOMBRE, nunca por IP):
+      PISHOP_CATALOGO_SERVICE_URL: http://catalogo-service:8001       # paso 1: validar producto
+      PISHOP_INVENTARIO_SERVICE_URL: http://inventario-service:8002   # paso 2: reservar stock
+      PISHOP_PEDIDOS_SERVICE_URL: http://pedidos-service:8003         # paso 3: crear pedido
+      PISHOP_PAGOS_SERVICE_URL: http://pagos-service:8004             # paso 4: cobrar
 
-  api-publica:
+  api-publica:                                    # P07: unica puerta desde internet
     <<: *servicio
     build: ./services/api-publica
     ports: ["8000:8000"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: api-publica, PISHOP_HTTP_PORT: "8000", PISHOP_API_KEY: ${PISHOP_API_KEY:?defina PISHOP_API_KEY en .env}}
+    environment:
+      <<: *env-comun
+      PISHOP_SERVICE_NAME: api-publica
+      PISHOP_HTTP_PORT: "8000"
+      PISHOP_API_KEY: ${PISHOP_API_KEY:?defina PISHOP_API_KEY en .env}   # llave que deben mandar los clientes, desde el .env
+      PISHOP_CHECKOUT_BFF_URL: http://checkout-bff:8080           # las compras se reenvian al checkout
+      PISHOP_CATALOGO_URL: http://catalogo-service:8001       # la lista de productos se pide al catalogo
+
+
+volumes:
+  pgdata:              
