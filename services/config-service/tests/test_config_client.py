@@ -145,3 +145,32 @@ def test_bucle_de_polling_iniciar_y_detener():
         assert c.version == 1
 
     _run(_correr())
+
+
+def test_callback_on_update_se_dispara_solo_cuando_cambia_la_version():
+    eventos: list[tuple[int, int]] = []
+    version_actual = {"v": 1, "tam": 25}
+
+    def _simulador(request: httpx.Request) -> httpx.Response:
+        etag = f'"v{version_actual["v"]}"'
+        if request.headers.get("If-None-Match") == etag:
+            return httpx.Response(304, headers={"ETag": etag})
+        return httpx.Response(
+            200,
+            headers={"ETag": etag},
+            json={"version": version_actual["v"], "data": {"pagina_tamano": version_actual["tam"]}},
+        )
+
+    cliente = ConfigClient(
+        base_url="http://config-service:8010",
+        service_name="catalogo-service",
+        app_env="prod",
+        transport=httpx.MockTransport(_simulador),
+        on_update=lambda v, d: eventos.append((v, d["pagina_tamano"])),
+    )
+    assert _run(cliente.refrescar()) is True
+    assert _run(cliente.refrescar()) is False  # 304 -> no dispara callback
+    version_actual.update(v=2, tam=60)
+    assert _run(cliente.refrescar()) is True
+    assert eventos == [(1, 25), (2, 60)]
+

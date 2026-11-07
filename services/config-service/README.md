@@ -170,7 +170,7 @@ python herramientas/validar_entrega.py config-service
 Resumen: {'config-service': 'OK'}
 ```
 
-### 8.2 Salida de `pytest` (19 pruebas sin servicios externos)
+### 8.2 Salida de `pytest` (21 pruebas sin servicios externos)
 
 ```text
 $ pytest -v
@@ -182,10 +182,12 @@ tests/test_config_client.py::test_arranca_con_defaults_si_config_service_esta_ca
 tests/test_config_client.py::test_refrescar_usa_etag_recibe_304_y_recarga_en_caliente_nueva_version PASSED
 tests/test_config_client.py::test_conserva_ultima_version_si_el_servidor_cae_despues_de_arrancar PASSED
 tests/test_config_client.py::test_bucle_de_polling_iniciar_y_detener PASSED
+tests/test_config_client.py::test_callback_on_update_se_dispara_solo_cuando_cambia_la_version PASSED
 tests/test_etag_rollback.py::test_etag_y_if_none_match_devuelve_304 PASSED
 tests/test_etag_rollback.py::test_consultar_version_historica_especifica PASSED
 tests/test_etag_rollback.py::test_rollback_crea_nueva_version_inmutable PASSED
 tests/test_health.py::test_las_tres_sondas PASSED
+tests/test_health.py::test_readiness_devuelve_503_si_base_de_datos_falla_pero_liveness_sigue_200 PASSED
 tests/test_seed.py::test_seed_json_carga_los_7_servicios_en_los_4_entornos PASSED
 tests/test_seed.py::test_arranca_con_configuracion_vacia_si_no_hay_seed PASSED
 tests/test_versionado.py::test_config_inexistente_da_404_con_formato_del_contrato PASSED
@@ -193,7 +195,7 @@ tests/test_versionado.py::test_put_crea_versiones_monotonas PASSED
 tests/test_versionado.py::test_historial_registra_autor_motivo_y_fecha PASSED
 tests/test_versionado.py::test_entornos_y_apps_son_independientes PASSED
 tests/test_versionado.py::test_validacion_422 PASSED
-19 passed in 1.07s
+21 passed in 1.12s
 ```
 
 ### 8.3 Evidencia de peticiones HTTP (`ETag`, `304`, `PUT` con `X-Autor`, `?version=1`, `/versions` y `rollback`)
