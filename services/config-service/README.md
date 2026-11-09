@@ -170,7 +170,7 @@ python herramientas/validar_entrega.py config-service
 Resumen: {'config-service': 'OK'}
 ```
 
-### 8.2 Salida de `pytest` (21 pruebas sin servicios externos)
+### 8.2 Salida de `pytest` (22 pruebas sin servicios externos)
 
 ```text
 $ pytest -v
@@ -190,12 +190,13 @@ tests/test_health.py::test_las_tres_sondas PASSED
 tests/test_health.py::test_readiness_devuelve_503_si_base_de_datos_falla_pero_liveness_sigue_200 PASSED
 tests/test_seed.py::test_seed_json_carga_los_7_servicios_en_los_4_entornos PASSED
 tests/test_seed.py::test_arranca_con_configuracion_vacia_si_no_hay_seed PASSED
+tests/test_seed.py::test_ready_devuelve_503_en_qa_si_no_hay_configuracion_aplicada PASSED
 tests/test_versionado.py::test_config_inexistente_da_404_con_formato_del_contrato PASSED
 tests/test_versionado.py::test_put_crea_versiones_monotonas PASSED
 tests/test_versionado.py::test_historial_registra_autor_motivo_y_fecha PASSED
 tests/test_versionado.py::test_entornos_y_apps_son_independientes PASSED
 tests/test_versionado.py::test_validacion_422 PASSED
-21 passed in 1.12s
+22 passed in 0.89s
 ```
 
 ### 8.3 Evidencia de peticiones HTTP (`ETag`, `304`, `PUT` con `X-Autor`, `?version=1`, `/versions` y `rollback`)

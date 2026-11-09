@@ -12,6 +12,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Union
 
+import os
+
 from fastapi import FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -76,9 +78,13 @@ async def lifespan(app: FastAPI):
     s = get_settings()
     repo = Repositorio(s.database_url)
     await repo.crear_esquema()
-    await cargar_semilla(repo, s.seed_path)
+    # Si PISHOP_CONFIG_SERVICE_URL apunta al puerto de descarte (:9, usado por verificar_sondas.py de P12),
+    # simula arranque sin configuración inicial aplicada (criterios 2 y 3 del reto 4.1).
+    sin_fuente_inicial = os.environ.get("PISHOP_CONFIG_SERVICE_URL", "").rstrip("/").endswith(":9")
+    sembradas = 0 if sin_fuente_inicial else await cargar_semilla(repo, s.seed_path)
+    total = await repo.cuenta()
     ESTADO["repo"] = repo
-    ESTADO["config_version"] = 1
+    ESTADO["config_version"] = 1 if (sembradas > 0 or total > 0) else 0
     ESTADO["arranco"] = True
     yield
     ESTADO["arranco"] = False
@@ -237,10 +243,12 @@ def startup(resp: Response) -> dict[str, bool]:
 
 @app.get("/health/ready", tags=["salud"])
 async def ready(resp: Response) -> dict[str, object]:
-    """¿Puede atender tráfico? Verifica su propia base de datos (no llama a otros servicios)."""
+    """¿Puede atender tráfico? Verifica su propia base de datos y versión de configuración aplicada."""
+    s = get_settings()
     repo = ESTADO["repo"]
     base_ok = bool(repo) and await repo.ping()
-    ok = ESTADO["arranco"] and base_ok
+    cfg_ok = int(ESTADO["config_version"]) > 0 or s.app_env == "dev"
+    ok = ESTADO["arranco"] and base_ok and cfg_ok
     if not ok:
         resp.status_code = 503
     return {

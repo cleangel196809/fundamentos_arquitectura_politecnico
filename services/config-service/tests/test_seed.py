@@ -33,5 +33,20 @@ def test_arranca_con_configuracion_vacia_si_no_hay_seed(monkeypatch, tmp_path):
     monkeypatch.setenv("PISHOP_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setenv("PISHOP_SEED_PATH", str(tmp_path / "no-existe.json"))
     with TestClient(app) as c:
-        assert c.get("/health/ready").status_code == 200
+        assert c.get("/health/live").status_code == 200
+        assert c.get("/health/startup").status_code == 200
+        assert c.get("/health/ready").status_code == 200  # en dev permite config_version == 0
         assert c.get("/config/catalogo-service/prod").status_code == 404
+
+
+def test_ready_devuelve_503_en_qa_si_no_hay_configuracion_aplicada(monkeypatch, tmp_path):
+    # Criterio 2 y 3 del reto 4.1: arranca en qa aunque no haya semilla/configuración,
+    # pero /health/ready responde 503 mientras config_version == 0.
+    monkeypatch.setenv("PISHOP_APP_ENV", "qa")
+    monkeypatch.setenv("PISHOP_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("PISHOP_SEED_PATH", str(tmp_path / "no-existe.json"))
+    with TestClient(app) as c:
+        assert c.get("/health/live").status_code == 200
+        assert c.get("/health/startup").status_code == 200
+        r = c.get("/health/ready")
+        assert r.status_code == 503 and r.json()["config_version"] == 0

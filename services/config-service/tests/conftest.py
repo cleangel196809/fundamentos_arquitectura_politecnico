@@ -9,6 +9,7 @@ def client(monkeypatch, tmp_path):
     vacia = tmp_path / "seed.json"
     vacia.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PISHOP_SEED_PATH", str(vacia))
+    monkeypatch.setenv("PISHOP_APP_ENV", "dev")
     from app.main import app
 
     with TestClient(app) as c:   # `with` dispara el lifespan
