@@ -1,7 +1,9 @@
 """Cliente reutilizable de configuración para servicios de PiShop Cloud (P08).
 
 Implementa los criterios de la semana 4 (diapositivas 23-28 y 48, Reto 4.1):
-  - Polling periódico (por defecto cada 15 s) contra config-service.
+  - Tiempo real por long-polling: el bucle deja abierta la petición con
+    `?esperar=25` + If-None-Match y recibe el cambio en cuanto ocurre el PUT.
+  - Respaldo por polling periódico (cada 15 s) si el servidor no soporta long-polling o falla.
   - Cabecera If-None-Match con ETag: si responde 304 Not Modified no toca el estado.
   - Timeout explícito con httpx.AsyncClient (regla 4 del contrato).
   - Tolerancia a fallo: si el config-service está caído al arrancar o durante un
@@ -35,6 +37,7 @@ class ConfigClient:
         defaults: dict[str, Any] | None = None,
         poll_seconds: float = 15.0,
         timeout_seconds: float = 2.0,
+        espera_seconds: float = 25.0,
         transport: httpx.AsyncBaseTransport | None = None,
         estado_externo: dict[str, Any] | None = None,
         on_update: Callable[[int, dict[str, Any]], None] | None = None,
@@ -45,6 +48,7 @@ class ConfigClient:
         self.defaults: dict[str, Any] = dict(defaults or {})
         self.poll_seconds = poll_seconds
         self.timeout_seconds = timeout_seconds
+        self.espera_seconds = espera_seconds  # long-polling; 0 = polling clásico
         self._transport = transport
         self._estado_externo = estado_externo
         self._on_update = on_update
@@ -67,19 +71,23 @@ class ConfigClient:
         """Devuelve el valor efectivo (remoto sobre default)."""
         return self.data.get(clave, self.defaults.get(clave, defecto))
 
-    async def refrescar(self) -> bool:
+    async def refrescar(self, esperar: float = 0.0) -> bool:
         """Consulta el config-service una vez.
 
+        Con `esperar` > 0 y un ETag conocido hace long-polling: el servidor retiene
+        la petición hasta que haya una versión nueva (tiempo real) o pasen `esperar` s.
         Retorna True si aplicó una versión nueva, False si hubo 304 o si falló
         (en cuyo caso conserva la versión previa o los defaults).
         """
         cabeceras = {"If-None-Match": self.etag} if self.etag else {}
         url = f"{self.base_url}/config/{self.service_name}/{self.app_env}"
+        params = {"esperar": esperar} if (esperar > 0 and self.etag) else None
+        # Timeout explícito: conexión = timeout_seconds; lectura = espera del long-poll + margen.
+        espera_lectura = esperar if params else 0.0
+        timeout = httpx.Timeout(self.timeout_seconds, read=self.timeout_seconds + espera_lectura)
         try:
-            async with httpx.AsyncClient(
-                timeout=self.timeout_seconds, transport=self._transport
-            ) as c:
-                r = await c.get(url, headers=cabeceras)
+            async with httpx.AsyncClient(timeout=timeout, transport=self._transport) as c:
+                r = await c.get(url, headers=cabeceras, params=params)
             if r.status_code == 304:
                 self.ultimo_error = None
                 return False
@@ -113,9 +121,19 @@ class ConfigClient:
             self._tarea = asyncio.create_task(self._bucle())
 
     async def _bucle(self) -> None:
+        loop = asyncio.get_running_loop()
         while True:
-            await asyncio.sleep(self.poll_seconds)
-            await self.refrescar()
+            if self.espera_seconds > 0 and self.etag and self.ultimo_error is None:
+                inicio = loop.time()
+                cambio = await self.refrescar(esperar=self.espera_seconds)
+                # Si el servidor respondió 304 al instante (no soporta long-polling)
+                # o falló, se cae al polling clásico para no saturarlo.
+                rapido = (loop.time() - inicio) < self.espera_seconds / 2
+                if not cambio and (rapido or self.ultimo_error):
+                    await asyncio.sleep(self.poll_seconds)
+            else:
+                await asyncio.sleep(self.poll_seconds)
+                await self.refrescar()
 
     async def detener(self) -> None:
         """Detiene limpiamente la tarea de polling en el cierre del lifespan."""
