@@ -71,6 +71,7 @@ Todas las rutas `/config/*` exigen **`Authorization: Bearer <PISHOP_API_TOKEN>`*
 - Las sondas quedan libres porque Docker/Kubernetes y Consul deben poder consultarlas sin credenciales.
 - `config_client.py` envía el token: parámetro `api_token=` o variable `PISHOP_CONFIG_SERVICE_TOKEN` en el servicio cliente.
 - En Swagger (`/docs`) aparece el botón **Authorize** (esquema `HTTPBearer`).
+- **Para probar (entorno `dev`):** el token de prueba es **`pishop-dev-2026`** (ver `.env.example`). En `dev`, `/docs` abre **ya autorizado** con el token configurado y con *Try it out* activo y ejemplos precargados (`catalogo-service`, `prod`, `X-Autor: fnavarro` y un cuerpo de ejemplo), así que se pueden ingresar datos y ejecutar sin escribir la clave. En `qa`, `stg` y `prod` el token **no** se inyecta en la página: hay que pulsar *Authorize* y escribirlo.
 - En `docker compose` se debe agregar `PISHOP_API_TOKEN` a config-service y `PISHOP_CONFIG_SERVICE_TOKEN` a los servicios que lo consumen, ambos desde el archivo `.env` (coordinar con P12).
 
 ```bash
@@ -271,6 +272,8 @@ tests/test_token.py::test_config_client_envia_el_token_como_bearer PASSED
 32 passed
 ```
 
+Swagger listo para probar (4 pruebas nuevas en `tests/test_docs.py`): *Try it out* activo, ejemplos en el OpenAPI, autorizado solo en `dev` y sin exponer el token fuera de `dev` → **36 passed**.
+
 > Las salidas de 8.3 se capturaron antes de agregar el token; hoy cada petición a `/config/*` lleva además `Authorization: Bearer <token>`.
 
 ### 8.3 Evidencia de peticiones HTTP (`ETag`, `304`, `PUT` con `X-Autor`, `?version=1`, `/versions` y `rollback`)
@@ -328,7 +331,7 @@ tests/test_token.py::test_config_client_envia_el_token_como_bearer PASSED
 |---|---|---|
 | **ISO 9000 / ISO 9001 §7.5** (*Información documentada y control de cambios*) | Todo cambio operativo debe estar identificado, versionado, con autor, motivo, fecha y posibilidad de reversión sin pérdida de trazabilidad. | Tabla inmutable `config_versiones` (*append-only*): cada `PUT` exige cabecera `X-Autor`, registra `motivo`, `creado_en` (UTC) y número de `version` monótono; `POST /rollback/{version}` restaura valores creando una nueva versión auditada. |
 | **ISO 9000 / ISO 9001 §8.5.2** (*Identificación y trazabilidad*) | Identificación única de cada elemento de configuración por aplicación, entorno y versión. | Clave única compuesta `(app, env, version)`, etiqueta HTTP `ETag: "vN"` y reporte de `config_version` en `/health/ready`. |
-| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **32 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
+| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **36 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
 | **ISO/IEC 25010 — Fiabilidad** (*Tolerancia a fallos y recuperabilidad*) | El sistema sigue operando aunque falle un componente de soporte. | `ConfigClient` captura `httpx.HTTPError` y mantiene operando al servicio con `defaults` o con la última versión válida en caché local; `/health/live` (`200`) se separa de `/health/ready` (`503`). |
 | **ISO/IEC 25010 — Eficiencia de desempeño** (*Utilización de recursos*) | Minimizar tráfico y procesamiento innecesario en red. | Uso de `If-None-Match` y respuesta `304 Not Modified` sin cuerpo cuando la versión vigente no ha cambiado. |
 | **ISO/IEC 25010 — Seguridad** (*Confidencialidad, integridad y no repudio*) | Separación entre parámetros y secretos, e integridad del rastro de auditoría. | Token obligatorio de la API (`Authorization: Bearer`, `PISHOP_API_TOKEN` como `SecretStr`, comparación en tiempo constante y falla cerrada), secretos tipados con `SecretStr` (`PISHOP_WRITE_TOKEN`), rechazo `422` si falta `X-Autor` (`AUTOR_VACIO`) y `401` si el token de escritura no coincide. |
