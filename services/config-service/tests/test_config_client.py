@@ -6,6 +6,7 @@ import httpx
 from app.config_client import ESTADO, ConfigClient
 from app.main import RUTA_SEED_POR_DEFECTO, app, cargar_semilla
 from app.store import Repositorio
+from tests.conftest import AUTH, TOKEN
 
 
 def _run(coro):
@@ -54,6 +55,7 @@ def test_refrescar_usa_etag_recibe_304_y_recarga_en_caliente_nueva_version():
             defaults={"pagina_tamano": 10},
             transport=transporte,
             estado_externo=estado_srv,
+            api_token=TOKEN,
         )
 
         # 1) Primer refresco: recibe v1 de la semilla (pagina_tamano=50 en prod)
@@ -69,7 +71,7 @@ def test_refrescar_usa_etag_recibe_304_y_recarga_en_caliente_nueva_version():
         assert cliente.version == 1
 
         # 3) Publicamos v2 en el servidor (cambio en caliente de pagina_tamano a 80)
-        async with httpx.AsyncClient(transport=transporte, base_url="http://config-service:8010") as c:
+        async with httpx.AsyncClient(transport=transporte, base_url="http://config-service:8010", headers=AUTH) as c:
             r = await c.put(
                 "/config/catalogo-service/prod",
                 json={"data": {"pagina_tamano": 80, "timeout_inventario_s": 1.2}, "motivo": "campaña cosecha"},
