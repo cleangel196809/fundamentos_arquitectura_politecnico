@@ -2,6 +2,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import RUTA_SEED_POR_DEFECTO, app
+from tests.conftest import AUTH
 
 SERVICIOS_DOMINIO = (
     "catalogo-service",
@@ -18,7 +19,7 @@ ENTORNOS = ("dev", "qa", "stg", "prod")
 def test_seed_json_carga_los_7_servicios_en_los_4_entornos(monkeypatch):
     monkeypatch.setenv("PISHOP_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setenv("PISHOP_SEED_PATH", str(RUTA_SEED_POR_DEFECTO))
-    with TestClient(app) as c:
+    with TestClient(app, headers=AUTH) as c:
         for srv in SERVICIOS_DOMINIO:
             for env in ENTORNOS:
                 r = c.get(f"/config/{srv}/{env}")
@@ -32,7 +33,7 @@ def test_seed_json_carga_los_7_servicios_en_los_4_entornos(monkeypatch):
 def test_arranca_con_configuracion_vacia_si_no_hay_seed(monkeypatch, tmp_path):
     monkeypatch.setenv("PISHOP_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setenv("PISHOP_SEED_PATH", str(tmp_path / "no-existe.json"))
-    with TestClient(app) as c:
+    with TestClient(app, headers=AUTH) as c:
         assert c.get("/health/live").status_code == 200
         assert c.get("/health/startup").status_code == 200
         assert c.get("/health/ready").status_code == 200  # en dev permite config_version == 0
