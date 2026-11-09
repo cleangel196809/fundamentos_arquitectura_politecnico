@@ -29,3 +29,9 @@ def test_openapi_trae_ejemplos_para_probar(client):
     params = {p["name"]: p for p in put["parameters"]}
     assert params["app_name"]["examples"]["catalogo"]["value"] == "catalogo-service"
     assert params["x-autor"]["examples"]["autor"]["value"] == "fnavarro"
+
+
+def test_put_se_muestra_en_verde_en_swagger(client):
+    html = client.get("/docs").text
+    assert ".opblock.opblock-put .opblock-summary-method{background:#49cc90!important}" in html
+    assert html.index("swagger-ui.css") < html.index("opblock-put")  # el estilo va después del CSS de Swagger
