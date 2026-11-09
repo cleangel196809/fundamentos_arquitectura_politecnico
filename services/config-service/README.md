@@ -42,12 +42,15 @@ Todos los servicios de PiShop Cloud resuelven su configuración con la misma jer
 | `PISHOP_APP_ENV` | `str` | `"dev"` | Entorno activo (`dev`, `qa`, `stg`, `prod`). |
 | `PISHOP_DATABASE_URL` | `str` | `"sqlite+aiosqlite:///./config.db"` | URL de la base propia de versiones (en pruebas `:memory:`). |
 | `PISHOP_SEED_PATH` | `str` | `""` (`./seed.json`) | Ruta al archivo semilla con los 7 servicios × 4 entornos. Si no existe, arranca vacío. |
+| `PISHOP_API_TOKEN` | `SecretStr` | `SecretStr("")` | **Obligatorio.** Token de la API: todo `/config/*` exige `Authorization: Bearer <token>`. Si no se define, la API responde `503 TOKEN_NO_CONFIGURADO` (falla cerrada). |
 | `PISHOP_WRITE_TOKEN` | `SecretStr` | `SecretStr("")` | Token opcional (`X-Write-Token`) para autorizar escrituras además de `X-Autor`. |
 | `PISHOP_HTTP_TIMEOUT_SECONDS` | `float` | `2.0` | Timeout explícito en segundos para llamadas HTTP salientes. |
 
 ---
 
 ## 4. Contrato HTTP (puerto `8010`)
+
+Todas las rutas `/config/*` exigen **`Authorization: Bearer <PISHOP_API_TOKEN>`** → sin token o con token inválido: `401 TOKEN_INVALIDO` (cabecera `WWW-Authenticate: Bearer`). Las sondas `/health/*`, `/docs` y `/openapi.json` no piden token.
 
 | Método | Ruta | Cabeceras / Query | Respuestas |
 |---|---|---|---|
@@ -60,12 +63,27 @@ Todos los servicios de PiShop Cloud resuelven su configuración con la misma jer
 | `GET` | `/health/startup` | — | `200 OK` / `503` sonda *startup* (indica si el `lifespan` terminó de crear esquema y cargar `seed.json`) |
 | `GET` | `/health/ready` | — | `200 OK` / `503` sonda *readiness* (verifica `SELECT 1` en SQLite y expone `config_version`) |
 
-### 4.1 Propagación en tiempo real de un `PUT`
+### 4.1 Token de la API (`Authorization: Bearer`)
+
+- El token entra **solo** por la variable de entorno `PISHOP_API_TOKEN`, tipada como `SecretStr` (no se imprime en logs ni en `repr`); no hay ningún valor escrito en el código.
+- `verificar_token()` en `app/main.py` es una dependencia de FastAPI aplicada a las 5 rutas `/config/*`; compara con `secrets.compare_digest` (tiempo constante, evita ataques de temporización).
+- **Falla cerrada:** si el despliegue olvida definir el token, la API responde `503` en vez de quedar abierta.
+- Las sondas quedan libres porque Docker/Kubernetes y Consul deben poder consultarlas sin credenciales.
+- `config_client.py` envía el token: parámetro `api_token=` o variable `PISHOP_CONFIG_SERVICE_TOKEN` en el servicio cliente.
+- En Swagger (`/docs`) aparece el botón **Authorize** (esquema `HTTPBearer`).
+- En `docker compose` se debe agregar `PISHOP_API_TOKEN` a config-service y `PISHOP_CONFIG_SERVICE_TOKEN` a los servicios que lo consumen, ambos desde el archivo `.env` (coordinar con P12).
+
+```bash
+curl -i http://127.0.0.1:8010/config/catalogo-service/prod                                  # 401
+curl -i -H "Authorization: Bearer $PISHOP_API_TOKEN" http://127.0.0.1:8010/config/catalogo-service/prod   # 200
+```
+
+### 4.2 Propagación en tiempo real de un `PUT`
 
 Un `PUT` o un rollback despierta de inmediato (con un `asyncio.Condition`) a todas las peticiones que esperan cambios:
 
 - **Long-polling (lo usa `config_client.py`):** el cliente envía `GET ...?esperar=25` con `If-None-Match: "vN"`. Si no hay cambios, el servidor retiene la petición; cuando llega el `PUT` responde `200` con `vN+1` en milisegundos. Si pasan 25 s sin cambios responde `304` y el cliente vuelve a esperar. Medido en local: el `GET` en espera respondió a los 1,0 s, justo cuando se envió el `PUT`.
-- **SSE (para ver el cambio en el navegador):** abrir `http://127.0.0.1:8010/config/catalogo-service/prod/eventos` y publicar un `PUT` desde `/docs`; el evento aparece al instante.
+- **SSE (canal de eventos en vivo):** `curl -N -H "Authorization: Bearer $PISHOP_API_TOKEN" http://127.0.0.1:8010/config/catalogo-service/prod/eventos` y publicar un `PUT` desde `/docs`; el evento aparece al instante.
 - **Respaldo:** si el servidor no soporta long-polling o falla, el cliente vuelve al polling clásico cada 15 s (`poll_seconds`).
 - **Alcance:** el aviso es en memoria del proceso; con varias réplicas de config-service cada réplica avisa a sus propios clientes y el polling de respaldo cubre la diferencia (para avisar entre réplicas se usaría Redis Pub/Sub, ya disponible en el compose).
 
@@ -156,6 +174,7 @@ await cliente_cfg.detener()
 cd services/config-service
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt
+set PISHOP_API_TOKEN=<un-token-largo-y-aleatorio>        # PowerShell: $env:PISHOP_API_TOKEN="..."
 .venv/Scripts/uvicorn app.main:app --host 0.0.0.0 --port 8010
 ```
 
@@ -240,6 +259,20 @@ tests/test_tiempo_real.py::test_eventos_sse_emite_version_vigente_y_cada_cambio 
 26 passed
 ```
 
+Tras agregar el token obligatorio de la API (6 pruebas nuevas en `tests/test_token.py`):
+
+```text
+tests/test_token.py::test_sin_token_todo_config_responde_401 PASSED
+tests/test_token.py::test_token_incorrecto_responde_401 PASSED
+tests/test_token.py::test_token_correcto_permite_leer_y_escribir PASSED
+tests/test_token.py::test_sondas_no_exigen_token PASSED
+tests/test_token.py::test_sin_token_configurado_la_api_queda_cerrada_503 PASSED
+tests/test_token.py::test_config_client_envia_el_token_como_bearer PASSED
+32 passed
+```
+
+> Las salidas de 8.3 se capturaron antes de agregar el token; hoy cada petición a `/config/*` lleva además `Authorization: Bearer <token>`.
+
 ### 8.3 Evidencia de peticiones HTTP (`ETag`, `304`, `PUT` con `X-Autor`, `?version=1`, `/versions` y `rollback`)
 
 ```text
@@ -295,10 +328,10 @@ tests/test_tiempo_real.py::test_eventos_sse_emite_version_vigente_y_cada_cambio 
 |---|---|---|
 | **ISO 9000 / ISO 9001 §7.5** (*Información documentada y control de cambios*) | Todo cambio operativo debe estar identificado, versionado, con autor, motivo, fecha y posibilidad de reversión sin pérdida de trazabilidad. | Tabla inmutable `config_versiones` (*append-only*): cada `PUT` exige cabecera `X-Autor`, registra `motivo`, `creado_en` (UTC) y número de `version` monótono; `POST /rollback/{version}` restaura valores creando una nueva versión auditada. |
 | **ISO 9000 / ISO 9001 §8.5.2** (*Identificación y trazabilidad*) | Identificación única de cada elemento de configuración por aplicación, entorno y versión. | Clave única compuesta `(app, env, version)`, etiqueta HTTP `ETag: "vN"` y reporte de `config_version` en `/health/ready`. |
-| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **26 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
+| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **32 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
 | **ISO/IEC 25010 — Fiabilidad** (*Tolerancia a fallos y recuperabilidad*) | El sistema sigue operando aunque falle un componente de soporte. | `ConfigClient` captura `httpx.HTTPError` y mantiene operando al servicio con `defaults` o con la última versión válida en caché local; `/health/live` (`200`) se separa de `/health/ready` (`503`). |
 | **ISO/IEC 25010 — Eficiencia de desempeño** (*Utilización de recursos*) | Minimizar tráfico y procesamiento innecesario en red. | Uso de `If-None-Match` y respuesta `304 Not Modified` sin cuerpo cuando la versión vigente no ha cambiado. |
-| **ISO/IEC 25010 — Seguridad** (*Confidencialidad, integridad y no repudio*) | Separación entre parámetros y secretos, e integridad del rastro de auditoría. | Secretos tipados con `SecretStr` (`PISHOP_WRITE_TOKEN`), rechazo `422` si falta `X-Autor` (`AUTOR_VACIO`) y `401` si el token de escritura no coincide. |
+| **ISO/IEC 25010 — Seguridad** (*Confidencialidad, integridad y no repudio*) | Separación entre parámetros y secretos, e integridad del rastro de auditoría. | Token obligatorio de la API (`Authorization: Bearer`, `PISHOP_API_TOKEN` como `SecretStr`, comparación en tiempo constante y falla cerrada), secretos tipados con `SecretStr` (`PISHOP_WRITE_TOKEN`), rechazo `422` si falta `X-Autor` (`AUTOR_VACIO`) y `401` si el token de escritura no coincide. |
 | **ISO/IEC 25010 — Mantenibilidad y Flexibilidad** (*Modularidad y adaptabilidad*) | Un mismo artefacto corre en cualquier entorno sin tocar el código. | Separación `main.py` / `store.py` / `settings.py` / `config_client.py` y promoción entre `dev`, `qa`, `stg` y `prod` mediante variables `PISHOP_*` y `seed.json`. |
 
 ---
