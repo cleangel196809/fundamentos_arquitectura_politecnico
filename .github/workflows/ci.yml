@@ -21,7 +21,7 @@ jobs:
           for d in services/*; do
             [ -d "$d/tests" ] || continue
             echo "== $d"
-            pip install httpx<0.28 fastapi pytest sqlalchemy
+            pip install "httpx<0.28" fastapi pytest sqlalchemy
             if [ -f "$d/requirements.txt" ]; then
               pip install -r "$d/requirements.txt"
             fi
