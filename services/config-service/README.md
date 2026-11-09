@@ -42,7 +42,7 @@ Todos los servicios de PiShop Cloud resuelven su configuración con la misma jer
 | `PISHOP_APP_ENV` | `str` | `"dev"` | Entorno activo (`dev`, `qa`, `stg`, `prod`). |
 | `PISHOP_DATABASE_URL` | `str` | `"sqlite+aiosqlite:///./config.db"` | URL de la base propia de versiones (en pruebas `:memory:`). |
 | `PISHOP_SEED_PATH` | `str` | `""` (`./seed.json`) | Ruta al archivo semilla con los 7 servicios × 4 entornos. Si no existe, arranca vacío. |
-| `PISHOP_API_TOKEN` | `SecretStr` | `SecretStr("")` | **Obligatorio.** Token de la API: todo `/config/*` exige `Authorization: Bearer <token>`. Si no se define, la API responde `503 TOKEN_NO_CONFIGURADO` (falla cerrada). |
+| `PISHOP_API_TOKEN` | `SecretStr` | `SecretStr("")` | Token de la API. **Definido:** todo `/config/*` exige `Authorization: Bearer <token>` (401 si falta). **Vacío:** API pública para pruebas (Swagger sin candados). |
 | `PISHOP_WRITE_TOKEN` | `SecretStr` | `SecretStr("")` | Token opcional (`X-Write-Token`) para autorizar escrituras además de `X-Autor`. |
 | `PISHOP_HTTP_TIMEOUT_SECONDS` | `float` | `2.0` | Timeout explícito en segundos para llamadas HTTP salientes. |
 
@@ -50,7 +50,7 @@ Todos los servicios de PiShop Cloud resuelven su configuración con la misma jer
 
 ## 4. Contrato HTTP (puerto `8010`)
 
-Todas las rutas `/config/*` exigen **`Authorization: Bearer <PISHOP_API_TOKEN>`** → sin token o con token inválido: `401 TOKEN_INVALIDO` (cabecera `WWW-Authenticate: Bearer`). Las sondas `/health/*`, `/docs` y `/openapi.json` no piden token.
+Si `PISHOP_API_TOKEN` está definido, todas las rutas `/config/*` exigen **`Authorization: Bearer <token>`** → sin token o con token inválido: `401 TOKEN_INVALIDO` (cabecera `WWW-Authenticate: Bearer`). Si no está definido, la API es **pública** (modo de prueba). Las sondas `/health/*`, `/docs` y `/openapi.json` nunca piden token.
 
 | Método | Ruta | Cabeceras / Query | Respuestas |
 |---|---|---|---|
@@ -67,7 +67,7 @@ Todas las rutas `/config/*` exigen **`Authorization: Bearer <PISHOP_API_TOKEN>`*
 
 - El token entra **solo** por la variable de entorno `PISHOP_API_TOKEN`, tipada como `SecretStr` (no se imprime en logs ni en `repr`); no hay ningún valor escrito en el código.
 - `verificar_token()` en `app/main.py` es una dependencia de FastAPI aplicada a las 5 rutas `/config/*`; compara con `secrets.compare_digest` (tiempo constante, evita ataques de temporización).
-- **Falla cerrada:** si el despliegue olvida definir el token, la API responde `503` en vez de quedar abierta.
+- **Dos modos:** sin `PISHOP_API_TOKEN` la API es **pública** para que el docente pruebe sin clave (el OpenAPI no declara seguridad, así que Swagger no muestra candados y las respuestas salen 200/201). Con `PISHOP_API_TOKEN` definido (qa/stg/prod, o `set PISHOP_API_TOKEN=pishop-dev-2026` en local) la API exige el token y Swagger muestra el botón *Authorize*.
 - Las sondas quedan libres porque Docker/Kubernetes y Consul deben poder consultarlas sin credenciales.
 - `config_client.py` envía el token: parámetro `api_token=` o variable `PISHOP_CONFIG_SERVICE_TOKEN` en el servicio cliente.
 - En Swagger (`/docs`) aparece el botón **Authorize** (esquema `HTTPBearer`).
@@ -274,6 +274,8 @@ tests/test_token.py::test_config_client_envia_el_token_como_bearer PASSED
 
 Swagger listo para probar (4 pruebas nuevas en `tests/test_docs.py`): *Try it out* activo, ejemplos en el OpenAPI, autorizado solo en `dev` y sin exponer el token fuera de `dev` → **36 passed**.
 
+Modo público sin token (pruebas en `tests/test_token.py`): sin `PISHOP_API_TOKEN` el `PUT`/`GET` responden 201/200 y el OpenAPI no tiene candados; con token, sí → **37 passed**.
+
 > Las salidas de 8.3 se capturaron antes de agregar el token; hoy cada petición a `/config/*` lleva además `Authorization: Bearer <token>`.
 
 ### 8.3 Evidencia de peticiones HTTP (`ETag`, `304`, `PUT` con `X-Autor`, `?version=1`, `/versions` y `rollback`)
@@ -331,7 +333,7 @@ Swagger listo para probar (4 pruebas nuevas en `tests/test_docs.py`): *Try it ou
 |---|---|---|
 | **ISO 9000 / ISO 9001 §7.5** (*Información documentada y control de cambios*) | Todo cambio operativo debe estar identificado, versionado, con autor, motivo, fecha y posibilidad de reversión sin pérdida de trazabilidad. | Tabla inmutable `config_versiones` (*append-only*): cada `PUT` exige cabecera `X-Autor`, registra `motivo`, `creado_en` (UTC) y número de `version` monótono; `POST /rollback/{version}` restaura valores creando una nueva versión auditada. |
 | **ISO 9000 / ISO 9001 §8.5.2** (*Identificación y trazabilidad*) | Identificación única de cada elemento de configuración por aplicación, entorno y versión. | Clave única compuesta `(app, env, version)`, etiqueta HTTP `ETag: "vN"` y reporte de `config_version` en `/health/ready`. |
-| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **36 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
+| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **37 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
 | **ISO/IEC 25010 — Fiabilidad** (*Tolerancia a fallos y recuperabilidad*) | El sistema sigue operando aunque falle un componente de soporte. | `ConfigClient` captura `httpx.HTTPError` y mantiene operando al servicio con `defaults` o con la última versión válida en caché local; `/health/live` (`200`) se separa de `/health/ready` (`503`). |
 | **ISO/IEC 25010 — Eficiencia de desempeño** (*Utilización de recursos*) | Minimizar tráfico y procesamiento innecesario en red. | Uso de `If-None-Match` y respuesta `304 Not Modified` sin cuerpo cuando la versión vigente no ha cambiado. |
 | **ISO/IEC 25010 — Seguridad** (*Confidencialidad, integridad y no repudio*) | Separación entre parámetros y secretos, e integridad del rastro de auditoría. | Token obligatorio de la API (`Authorization: Bearer`, `PISHOP_API_TOKEN` como `SecretStr`, comparación en tiempo constante y falla cerrada), secretos tipados con `SecretStr` (`PISHOP_WRITE_TOKEN`), rechazo `422` si falta `X-Autor` (`AUTOR_VACIO`) y `401` si el token de escritura no coincide. |
