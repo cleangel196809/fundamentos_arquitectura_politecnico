@@ -237,16 +237,44 @@ tests/test_versionado.py::test_validacion_422 PASSED
 
 ---
 
-## 10. Declaración de uso de IA generativa
+## 10. Evidencia de los contenidos de las Semanas 1 a 4 y Normas ISO (ISO 9000 / ISO 9001 e ISO/IEC 25010)
 
-Conforme a la sección 5 y 7 del enunciado del Parcial 1:
-- **Herramienta utilizada:** asistente de codificación con IA como apoyo en la estructuración del repositorio SQLite, redacción de pruebas `pytest` y formato del documento `README.md`.
-- **Qué verificó el estudiante:** revisión línea por línea de los endpoints en `app/main.py`, el almacén versionado en `app/store.py`, la lógica de `ETag` / `304` y `rollback`, el cliente `app/config_client.py`, la semilla `seed.json` para los 7 servicios en 4 entornos, la ejecución local de las 19 pruebas unitarias con `pytest` y la validación del contrato mediante `python herramientas/validar_entrega.py config-service`.
+### 10.1 Trazabilidad por semana del curso aplicada a `config-service` (P08)
+
+| Semana | Contenido del curso | Cómo lo evidencia y aplica P08 (`config-service`) |
+|---|---|---|
+| **Semana 1** | Atributos de calidad **ISO/IEC 25010**, *trade-offs*, C4/UML y antídoto del monolito distribuido | Base de datos propia (`config_versiones` en SQLite) sin compartir tablas con ningún otro servicio; diagrama UML de secuencia como código (Mermaid); *trade-off* explícito entre consistencia inmediata y desacoplamiento mediante *polling* con `ETag`. |
+| **Semana 2** | Partición vertical/horizontal, **DDD** (*bounded contexts*), tríada Core / Compuesto / API / Soporte | `config-service` es un servicio de **Soporte transversal** con su propio contexto delimitado de gobierno de configuración; separa el esquema de validación HTTP (`Publicacion` en Pydantic) de la entidad persistida (`VersionConfig` en `store.py`). |
+| **Semana 3** | Cubo de escalabilidad (**X, Y, Z**), timeouts explícitos, idempotencia y disponibilidad compuesta | Permite que los servicios escalen en el **eje X** (múltiples réplicas leyendo la misma fuente de verdad sin deriva de configuración); `config_client.py` usa `httpx.AsyncClient` con **timeout explícito (`2.0 s`)** y degradación elegante (caché local + *defaults*) para **no** restar disponibilidad compuesta a la ruta crítica del checkout. |
+| **Semana 4** | **Factor III (Twelve-Factor App)**, `ETag` / `304`, historial versionado, `rollback` y sondas `live` / `ready` / `startup` | Configuración 100 % externalizada por `PISHOP_*` (`frozen=True`) y secretos con `SecretStr`; `GET /config/{app}/{env}` con `ETag`/`If-None-Match` (`304`); `PUT` auditado con `X-Autor`; `POST /rollback/{version}`; semilla `seed.json` (7 servicios × 4 entornos) y las 3 sondas diferenciadas. |
+
+### 10.2 Cumplimiento de la familia **ISO 9000 / ISO 9001:2015** (Gestión de la Calidad) e **ISO/IEC 25010:2023** (Calidad de Producto de Software)
+
+| Norma / Cláusula | Principio de calidad | Implementación verificable en `services/config-service/` |
+|---|---|---|
+| **ISO 9000 / ISO 9001 §7.5** (*Información documentada y control de cambios*) | Todo cambio operativo debe estar identificado, versionado, con autor, motivo, fecha y posibilidad de reversión sin pérdida de trazabilidad. | Tabla inmutable `config_versiones` (*append-only*): cada `PUT` exige cabecera `X-Autor`, registra `motivo`, `creado_en` (UTC) y número de `version` monótono; `POST /rollback/{version}` restaura valores creando una nueva versión auditada. |
+| **ISO 9000 / ISO 9001 §8.5.2** (*Identificación y trazabilidad*) | Identificación única de cada elemento de configuración por aplicación, entorno y versión. | Clave única compuesta `(app, env, version)`, etiqueta HTTP `ETag: "vN"` y reporte de `config_version` en `/health/ready`. |
+| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **22 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
+| **ISO/IEC 25010 — Fiabilidad** (*Tolerancia a fallos y recuperabilidad*) | El sistema sigue operando aunque falle un componente de soporte. | `ConfigClient` captura `httpx.HTTPError` y mantiene operando al servicio con `defaults` o con la última versión válida en caché local; `/health/live` (`200`) se separa de `/health/ready` (`503`). |
+| **ISO/IEC 25010 — Eficiencia de desempeño** (*Utilización de recursos*) | Minimizar tráfico y procesamiento innecesario en red. | Uso de `If-None-Match` y respuesta `304 Not Modified` sin cuerpo cuando la versión vigente no ha cambiado. |
+| **ISO/IEC 25010 — Seguridad** (*Confidencialidad, integridad y no repudio*) | Separación entre parámetros y secretos, e integridad del rastro de auditoría. | Secretos tipados con `SecretStr` (`PISHOP_WRITE_TOKEN`), rechazo `422` si falta `X-Autor` (`AUTOR_VACIO`) y `401` si el token de escritura no coincide. |
+| **ISO/IEC 25010 — Mantenibilidad y Flexibilidad** (*Modularidad y adaptabilidad*) | Un mismo artefacto corre en cualquier entorno sin tocar el código. | Separación `main.py` / `store.py` / `settings.py` / `config_client.py` y promoción entre `dev`, `qa`, `stg` y `prod` mediante variables `PISHOP_*` y `seed.json`. |
 
 ---
 
-## 11. Referencias (APA 7)
+## 11. Declaración de uso de IA generativa
 
+Conforme a la sección 5 y 7 del enunciado del Parcial 1:
+- **Herramienta utilizada:** asistente de codificación con IA como apoyo en la estructuración del repositorio SQLite, redacción de pruebas `pytest` y formato del documento `README.md`.
+- **Qué verificó el estudiante:** revisión línea por línea de los endpoints en `app/main.py`, el almacén versionado en `app/store.py`, la lógica de `ETag` / `304` y `rollback`, el cliente `app/config_client.py`, la semilla `seed.json` para los 7 servicios en 4 entornos, la ejecución local de las 22 pruebas unitarias con `pytest` y la validación del contrato mediante `python herramientas/validar_entrega.py config-service`.
+
+---
+
+## 12. Referencias (APA 7)
+
+- International Organization for Standardization. (2015). *ISO 9000:2015 Quality management systems — Fundamentals and vocabulary*. ISO.
+- International Organization for Standardization. (2015). *ISO 9001:2015 Quality management systems — Requirements*. ISO.
+- International Organization for Standardization. (2023). *ISO/IEC 25010:2023 Systems and software engineering — Systems and software Quality Requirements and Evaluation (SQuaRE) — Product quality model*. ISO.
 - Newman, S. (2021). *Building Microservices: Designing Fine-Grained Systems* (2.ª ed.). O'Reilly Media.
 - Nygard, M. T. (2018). *Release It! Design and Deploy Production-Ready Software* (2.ª ed.). Pragmatic Bookshelf.
 - Richardson, C. (2018). *Microservices Patterns: With Examples in Java*. Manning Publications.
