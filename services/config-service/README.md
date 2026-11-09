@@ -51,13 +51,23 @@ Todos los servicios de PiShop Cloud resuelven su configuración con la misma jer
 
 | Método | Ruta | Cabeceras / Query | Respuestas |
 |---|---|---|---|
-| `GET` | `/config/{app_name}/{env}` | `If-None-Match: "vN"` (opcional), `?version=N` (opcional) | `200 OK` con header `ETag: "vN"` · `304 Not Modified` si coincide `If-None-Match` · `404` si no existe |
+| `GET` | `/config/{app_name}/{env}` | `If-None-Match: "vN"` (opcional), `?version=N` (opcional), `?esperar=S` (opcional, 0–30 s, *long-polling*) | `200 OK` con header `ETag: "vN"` · `304 Not Modified` si coincide `If-None-Match` · con `?esperar=S` la petición queda abierta y responde `200` **en cuanto** llega un `PUT`/rollback, o `304` al agotar `S` · `404` si no existe |
 | `PUT` | `/config/{app_name}/{env}` | **`X-Autor` obligatorio** (auditoría) | `201 Created` con `ETag: "vN+1"` · `422` si falta `X-Autor` o el cuerpo es inválido · `401` si `PISHOP_WRITE_TOKEN` está activo y no coincide |
 | `GET` | `/config/{app_name}/{env}/versions` | — | `200 OK` lista ordenada de versiones (`version`, `autor`, `motivo`, `creado_en`) · `404` si no hay historial |
 | `POST` | `/config/{app_name}/{env}/rollback/{version}` | `X-Autor` (default `sistema-rollback`) | `201 Created` publica versión `N+1` copiando los datos de `version` con motivo `"rollback a v{version}"` · `404` si la versión objetivo no existe |
+| `GET` | `/config/{app_name}/{env}/eventos` | — | `200` `text/event-stream` (*Server-Sent Events*): emite la versión vigente y luego **cada cambio al instante** (evento `config`, `id` = versión) |
 | `GET` | `/health/live` | — | `200 OK` sonda *liveness* (local y barata, no toca base de datos) |
 | `GET` | `/health/startup` | — | `200 OK` / `503` sonda *startup* (indica si el `lifespan` terminó de crear esquema y cargar `seed.json`) |
 | `GET` | `/health/ready` | — | `200 OK` / `503` sonda *readiness* (verifica `SELECT 1` en SQLite y expone `config_version`) |
+
+### 4.1 Propagación en tiempo real de un `PUT`
+
+Un `PUT` o un rollback despierta de inmediato (con un `asyncio.Condition`) a todas las peticiones que esperan cambios:
+
+- **Long-polling (lo usa `config_client.py`):** el cliente envía `GET ...?esperar=25` con `If-None-Match: "vN"`. Si no hay cambios, el servidor retiene la petición; cuando llega el `PUT` responde `200` con `vN+1` en milisegundos. Si pasan 25 s sin cambios responde `304` y el cliente vuelve a esperar. Medido en local: el `GET` en espera respondió a los 1,0 s, justo cuando se envió el `PUT`.
+- **SSE (para ver el cambio en el navegador):** abrir `http://127.0.0.1:8010/config/catalogo-service/prod/eventos` y publicar un `PUT` desde `/docs`; el evento aparece al instante.
+- **Respaldo:** si el servidor no soporta long-polling o falla, el cliente vuelve al polling clásico cada 15 s (`poll_seconds`).
+- **Alcance:** el aviso es en memoria del proceso; con varias réplicas de config-service cada réplica avisa a sus propios clientes y el polling de respaldo cubre la diferencia (para avisar entre réplicas se usaría Redis Pub/Sub, ya disponible en el compose).
 
 ---
 
@@ -191,7 +201,7 @@ En la carpeta [`evidencias/`](evidencias/) se encuentran las **4 capturas de pan
 Resumen: {'config-service': 'OK'}
 ```
 
-### 8.2 Salida de `pytest` (22 pruebas sin servicios externos)
+### 8.2 Salida de `pytest` (pruebas sin servicios externos)
 
 ```text
 $ pytest -v
@@ -218,6 +228,16 @@ tests/test_versionado.py::test_historial_registra_autor_motivo_y_fecha PASSED
 tests/test_versionado.py::test_entornos_y_apps_son_independientes PASSED
 tests/test_versionado.py::test_validacion_422 PASSED
 22 passed in 0.89s
+```
+
+Tras agregar la propagación en tiempo real (4 pruebas nuevas en `tests/test_tiempo_real.py`):
+
+```text
+tests/test_tiempo_real.py::test_long_polling_recibe_el_put_al_instante PASSED
+tests/test_tiempo_real.py::test_long_polling_sin_cambios_responde_304_al_agotar_la_espera PASSED
+tests/test_tiempo_real.py::test_config_client_recarga_en_tiempo_real_sin_esperar_el_polling PASSED
+tests/test_tiempo_real.py::test_eventos_sse_emite_version_vigente_y_cada_cambio PASSED
+26 passed
 ```
 
 ### 8.3 Evidencia de peticiones HTTP (`ETag`, `304`, `PUT` con `X-Autor`, `?version=1`, `/versions` y `rollback`)
@@ -249,9 +269,9 @@ tests/test_versionado.py::test_validacion_422 PASSED
 1. **Historial inmutable (*append-only*) frente a sobrescritura en sitio (`UPDATE`)**:
    - *Decisión:* tanto `PUT` como `POST /rollback/{version}` insertan una nueva fila `N+1` en `config_versiones`.
    - *Justificación:* en un incidente de producción es indispensable cruzar la línea de tiempo con cada cambio aplicado; si `rollback` borrara versiones intermedias, se perdería la trazabilidad de qué valor causó el fallo.
-2. **Polling con `ETag` (`If-None-Match`) cada 15 s frente a *push* por webhooks**:
-   - *Decisión:* el cliente consulta periódicamente con `If-None-Match` y recibe `304 Not Modified` cuando no hay cambios.
-   - *Trade-off:* se asume una ventana de convergencia de hasta 15 s entre instancias a cambio de eliminar el acoplamiento inverso (el servidor no necesita conocer las IPs dinámicas de las réplicas).
+2. **Long-polling con `ETag` (`If-None-Match` + `?esperar=25`) frente a *push* por webhooks y frente a polling simple**:
+   - *Decisión:* el cliente deja abierta una petición condicional; el servidor responde en cuanto hay una versión nueva (tiempo real) o `304` a los 25 s. Respaldo: polling cada 15 s.
+   - *Trade-off:* se obtiene propagación casi inmediata sin acoplamiento inverso (el servidor no necesita conocer las IPs dinámicas de las réplicas, como sí exigirían los webhooks), a cambio de mantener una conexión abierta por cliente. Con polling simple la ventana de convergencia era de hasta 15 s.
 3. **Resiliencia ante caída del servidor de configuración**:
    - *Decisión:* `ConfigClient` captura `httpx.HTTPError` con timeout explícito (`2.0 s`) y conserva el último diccionario válido o los *defaults* de código.
    - *Justificación:* evita que `config-service` se convierta en un punto único de falla (*Single Point of Failure*) que impida el arranque o tumbe a los 7 servicios de PiShop Cloud.
@@ -275,7 +295,7 @@ tests/test_versionado.py::test_validacion_422 PASSED
 |---|---|---|
 | **ISO 9000 / ISO 9001 §7.5** (*Información documentada y control de cambios*) | Todo cambio operativo debe estar identificado, versionado, con autor, motivo, fecha y posibilidad de reversión sin pérdida de trazabilidad. | Tabla inmutable `config_versiones` (*append-only*): cada `PUT` exige cabecera `X-Autor`, registra `motivo`, `creado_en` (UTC) y número de `version` monótono; `POST /rollback/{version}` restaura valores creando una nueva versión auditada. |
 | **ISO 9000 / ISO 9001 §8.5.2** (*Identificación y trazabilidad*) | Identificación única de cada elemento de configuración por aplicación, entorno y versión. | Clave única compuesta `(app, env, version)`, etiqueta HTTP `ETag: "vN"` y reporte de `config_version` en `/health/ready`. |
-| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **22 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
+| **ISO 9000 / ISO 9001 §9.1 y §10.2** (*Seguimiento, medición, no conformidad y acción correctiva*) | Verificación objetiva mediante pruebas automatizadas y corrección inmediata ante fallos. | Suite de **26 pruebas `pytest`**, validador `validar_entrega.py`, auditoría de 0 secretos embebidos y reversión inmediata con `/rollback/{version}`. |
 | **ISO/IEC 25010 — Fiabilidad** (*Tolerancia a fallos y recuperabilidad*) | El sistema sigue operando aunque falle un componente de soporte. | `ConfigClient` captura `httpx.HTTPError` y mantiene operando al servicio con `defaults` o con la última versión válida en caché local; `/health/live` (`200`) se separa de `/health/ready` (`503`). |
 | **ISO/IEC 25010 — Eficiencia de desempeño** (*Utilización de recursos*) | Minimizar tráfico y procesamiento innecesario en red. | Uso de `If-None-Match` y respuesta `304 Not Modified` sin cuerpo cuando la versión vigente no ha cambiado. |
 | **ISO/IEC 25010 — Seguridad** (*Confidencialidad, integridad y no repudio*) | Separación entre parámetros y secretos, e integridad del rastro de auditoría. | Secretos tipados con `SecretStr` (`PISHOP_WRITE_TOKEN`), rechazo `422` si falta `X-Autor` (`AUTOR_VACIO`) y `401` si el token de escritura no coincide. |
