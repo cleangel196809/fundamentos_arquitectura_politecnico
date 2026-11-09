@@ -166,13 +166,14 @@ python herramientas/validar_entrega.py config-service
 
 ---
 
-## 8. Evidencia reproducible (Salidas de consola + Capturas de pantalla PNG)
+## 8. Evidencia reproducible (Salidas de consola + Capturas de pantalla PNG + Swagger UI)
 
-En la carpeta [`evidencias/`](evidencias/) se encuentran las **capturas de pantalla (`.png`)** de las pruebas y de las peticiones HTTP reales:
+En la carpeta [`evidencias/`](evidencias/) se encuentran las **4 capturas de pantalla (`.png`)** tomadas directamente en este equipo (`DESKTOP-S4KE1E4`), incluyendo la interfaz web **Swagger UI (`/docs`)**:
 
 - ![Captura 1 — 22 pruebas pytest pasando](evidencias/01_captura_pytest_22_passed.png)
 - ![Captura 2 — Validador oficial del contrato](evidencias/02_captura_validador_contrato.png)
 - ![Captura 3 — Peticiones HTTP en vivo ETag, 304, PUT y Rollback](evidencias/03_captura_endpoints_http_curl.png)
+- ![Captura 4 — Interfaz web Swagger UI en http://127.0.0.1:8010/docs](evidencias/04_captura_swagger_openapi_docs.png)
 
 ### 8.1 Salida de `validar_entrega.py`
 
