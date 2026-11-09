@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 import socket
 import uuid
 from contextlib import asynccontextmanager
@@ -15,9 +16,10 @@ from typing import Any, Union
 
 import os
 
-from fastapi import FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from app.settings import get_settings
@@ -182,12 +184,34 @@ def _validar_escritura(x_autor: str, x_write_token: str | None) -> str:
     return autor
 
 
+# ---------- token de la API (Authorization: Bearer) ----------
+_bearer = HTTPBearer(auto_error=False, description="Token de la API: valor de PISHOP_API_TOKEN")
+
+
+async def verificar_token(credenciales: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> None:
+    """Exige 'Authorization: Bearer <PISHOP_API_TOKEN>' en todo /config/*. Las sondas /health quedan libres."""
+    esperado = get_settings().api_token.get_secret_value()
+    if not esperado:
+        # Falla cerrada: sin token configurado nadie usa la API (en vez de quedar abierta).
+        raise _error(503, "La API no tiene token configurado: defina PISHOP_API_TOKEN", "TOKEN_NO_CONFIGURADO")
+    recibido = credenciales.credentials if credenciales else ""
+    # compare_digest compara en tiempo constante (evita ataques de temporización).
+    if not recibido or not secrets.compare_digest(recibido.encode(), esperado.encode()):
+        raise HTTPException(
+            status_code=401,
+            detail={"detalle": "Token de la API ausente o inválido (Authorization: Bearer <token>)", "codigo": "TOKEN_INVALIDO"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+CON_TOKEN = [Depends(verificar_token)]
+
 AppNombre = PathParam(pattern=APP_PATRON, description="Nombre del servicio, p. ej. catalogo-service")
 Entorno = PathParam(pattern=ENV_PATRON, description="dev | qa | stg | prod")
 
 
 # ---------- API de configuración ----------
-@app.get("/config/{app_name}/{env}", tags=["config"], response_model=None)
+@app.get("/config/{app_name}/{env}", tags=["config"], response_model=None, dependencies=CON_TOKEN)
 async def obtener(
     response: Response,
     app_name: str = AppNombre,
@@ -227,7 +251,7 @@ async def obtener(
     return fila.a_dict()
 
 
-@app.put("/config/{app_name}/{env}", tags=["config"], status_code=201)
+@app.put("/config/{app_name}/{env}", tags=["config"], status_code=201, dependencies=CON_TOKEN)
 async def publicar(
     response: Response,
     cuerpo: Publicacion,
@@ -244,7 +268,7 @@ async def publicar(
     return fila.a_dict()
 
 
-@app.get("/config/{app_name}/{env}/versions", tags=["config"])
+@app.get("/config/{app_name}/{env}/versions", tags=["config"], dependencies=CON_TOKEN)
 async def historial(app_name: str = AppNombre, env: str = Entorno) -> list[dict[str, Any]]:
     filas = await _repo().historial(app_name, env)
     if not filas:
@@ -252,7 +276,7 @@ async def historial(app_name: str = AppNombre, env: str = Entorno) -> list[dict[
     return [f.a_dict(con_data=False) for f in filas]
 
 
-@app.post("/config/{app_name}/{env}/rollback/{version}", tags=["config"], status_code=201)
+@app.post("/config/{app_name}/{env}/rollback/{version}", tags=["config"], status_code=201, dependencies=CON_TOKEN)
 async def rollback(
     response: Response,
     app_name: str = AppNombre,
@@ -282,7 +306,7 @@ async def rollback(
     return nueva.a_dict()
 
 
-@app.get("/config/{app_name}/{env}/eventos", tags=["config"], response_class=StreamingResponse)
+@app.get("/config/{app_name}/{env}/eventos", tags=["config"], response_class=StreamingResponse, dependencies=CON_TOKEN)
 async def eventos(
     request: Request,
     app_name: str = AppNombre,
