@@ -2,6 +2,15 @@
 import pytest
 from fastapi.testclient import TestClient
 
+# Token de PRUEBA (no es un secreto real): se inyecta por variable de entorno como en producción.
+TOKEN = "token-de-prueba-p08"
+AUTH = {"Authorization": f"Bearer {TOKEN}"}
+
+
+@pytest.fixture(autouse=True)
+def _token_de_la_api(monkeypatch):
+    monkeypatch.setenv("PISHOP_API_TOKEN", TOKEN)
+
 
 @pytest.fixture
 def client(monkeypatch, tmp_path):
@@ -12,5 +21,5 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("PISHOP_APP_ENV", "dev")
     from app.main import app
 
-    with TestClient(app) as c:   # `with` dispara el lifespan
+    with TestClient(app, headers=AUTH) as c:   # `with` dispara el lifespan
         yield c
