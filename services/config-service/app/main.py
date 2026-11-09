@@ -5,6 +5,7 @@ Contrato: docs/CONTRATOS.md (P08) y contracts/endpoints.json.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import socket
 import uuid
@@ -16,7 +17,7 @@ import os
 
 from fastapi import FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.settings import get_settings
@@ -88,6 +89,7 @@ async def lifespan(app: FastAPI):
     ESTADO["arranco"] = True
     yield
     ESTADO["arranco"] = False
+    ESTADO["cambio"] = None
     await repo.cerrar()
     ESTADO["repo"] = None
 
@@ -114,6 +116,47 @@ async def _validacion(_: Request, exc: RequestValidationError) -> JSONResponse:
 
 def _repo() -> Repositorio:
     return ESTADO["repo"]
+
+
+# ---------- tiempo real: aviso de cambios (long-polling y SSE) ----------
+def _condicion() -> asyncio.Condition:
+    """Condición asyncio ligada al event loop actual; despierta a quien espera un cambio."""
+    loop = asyncio.get_running_loop()
+    if ESTADO.get("cambio") is None or ESTADO.get("cambio_loop") is not loop:
+        ESTADO["cambio"] = asyncio.Condition()
+        ESTADO["cambio_loop"] = loop
+    return ESTADO["cambio"]
+
+
+async def _notificar_cambio() -> None:
+    """Se llama tras cada PUT o rollback: despierta al instante a todos los que esperan."""
+    cond = _condicion()
+    async with cond:
+        cond.notify_all()
+
+
+async def _esperar_aviso(segundos: float) -> None:
+    """Espera un aviso de cambio o hasta agotar `segundos` (lo que ocurra primero)."""
+    cond = _condicion()
+    async with cond:
+        try:
+            await asyncio.wait_for(cond.wait(), timeout=max(segundos, 0))
+        except asyncio.TimeoutError:
+            pass
+
+
+async def _esperar_version_nueva(app_name: str, env: str, version_conocida: int, segundos: float):
+    """Long-polling: retorna la fila en cuanto haya una versión distinta de la conocida, o al agotar el tiempo."""
+    loop = asyncio.get_running_loop()
+    limite = loop.time() + segundos
+    while True:
+        fila = await _repo().actual(app_name, env)
+        if fila is not None and fila.version != version_conocida:
+            return fila
+        restante = limite - loop.time()
+        if restante <= 0:
+            return fila
+        await _esperar_aviso(restante)
 
 
 def _etag_para(version: int) -> str:
@@ -150,6 +193,12 @@ async def obtener(
     app_name: str = AppNombre,
     env: str = Entorno,
     version: int | None = Query(default=None, ge=1, description="Versión histórica específica"),
+    esperar: float = Query(
+        default=0,
+        ge=0,
+        le=30,
+        description="Long-polling: si If-None-Match coincide, espera hasta N s a que llegue una versión nueva",
+    ),
     if_none_match: str | None = Header(default=None),
 ) -> Response | dict[str, Any]:
     if version is not None:
@@ -166,6 +215,11 @@ async def obtener(
             raise _error(404, f"No hay configuración para {app_name}/{env}", "CONFIG_NO_ENCONTRADA")
 
     etag = _etag_para(fila.version)
+    if version is None and esperar > 0 and _coincide_etag(if_none_match, etag):
+        # Tiempo real: en vez de responder 304 de inmediato, mantiene la petición abierta
+        # y responde en cuanto un PUT o rollback publique una versión nueva.
+        fila = await _esperar_version_nueva(app_name, env, fila.version, esperar)
+        etag = _etag_para(fila.version)
     if _coincide_etag(if_none_match, etag):
         return Response(status_code=304, headers={"ETag": etag})
 
@@ -185,6 +239,7 @@ async def publicar(
     autor = _validar_escritura(x_autor, x_write_token)
     fila = await _repo().publicar(app_name, env, cuerpo.data, autor, cuerpo.motivo)
     ESTADO["config_version"] = max(int(ESTADO["config_version"]), fila.version)
+    await _notificar_cambio()
     response.headers["ETag"] = _etag_para(fila.version)
     return fila.a_dict()
 
@@ -222,8 +277,43 @@ async def rollback(
         motivo=f"rollback a v{version}",
     )
     ESTADO["config_version"] = max(int(ESTADO["config_version"]), nueva.version)
+    await _notificar_cambio()
     response.headers["ETag"] = _etag_para(nueva.version)
     return nueva.a_dict()
+
+
+@app.get("/config/{app_name}/{env}/eventos", tags=["config"], response_class=StreamingResponse)
+async def eventos(
+    request: Request,
+    app_name: str = AppNombre,
+    env: str = Entorno,
+    max_eventos: int | None = Query(default=None, ge=1, include_in_schema=False),
+) -> StreamingResponse:
+    """Server-Sent Events: emite la versión vigente y luego cada PUT/rollback al instante.
+
+    Ábralo en el navegador y publique un cambio desde /docs: aparece en tiempo real.
+    """
+
+    async def flujo():
+        ultima, enviados = 0, 0
+        while not await request.is_disconnected():
+            fila = await _repo().actual(app_name, env)
+            if fila is not None and fila.version != ultima:
+                ultima = fila.version
+                datos = json.dumps(fila.a_dict(), ensure_ascii=False)
+                yield f"id: {fila.version}\nevent: config\ndata: {datos}\n\n"
+                enviados += 1
+                if max_eventos and enviados >= max_eventos:
+                    return
+            else:
+                yield ": sin cambios\n\n"  # keep-alive para proxies
+            await _esperar_aviso(15)
+
+    return StreamingResponse(
+        flujo(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---------- sondas de salud (semántica diferenciada) ----------
