@@ -105,6 +105,16 @@ app = FastAPI(title=settings.service_name, version="1.0.0", lifespan=lifespan, d
 
 
 # ---------- Swagger UI listo para probar ----------
+ESTILO_PUT_VERDE = (
+    "<style>"
+    ".swagger-ui .opblock.opblock-put{border-color:#49cc90!important;background:rgba(73,204,144,.1)!important}"
+    ".swagger-ui .opblock.opblock-put .opblock-summary-method{background:#49cc90!important}"
+    ".swagger-ui .opblock.opblock-put .opblock-summary{border-color:#49cc90!important}"
+    ".swagger-ui .opblock.opblock-put .tab-header .tab-item.active h4 span:after{background:#49cc90!important}"
+    "</style>"
+)
+
+
 @app.get("/docs", include_in_schema=False)
 def documentacion() -> HTMLResponse:
     """Swagger con los campos editables desde el inicio ("Try it out" activo) y ejemplos precargados.
@@ -118,16 +128,18 @@ def documentacion() -> HTMLResponse:
         title=f"{s.service_name} - Swagger UI",
         swagger_ui_parameters={"tryItOutEnabled": True, "persistAuthorization": True},
     )
+    html = pagina.body.decode("utf-8")
+    # El PUT (publicar configuración) se muestra en VERDE, como operación de escritura habilitada.
+    html = html.replace("</head>", ESTILO_PUT_VERDE + "</head>")
     token = s.api_token.get_secret_value()
-    if s.app_env != "dev" or not token:
-        return pagina
-    autorizar = (
-        "<script>window.addEventListener('load', function () {"
-        " function autorizar() { ui.authActions.authorize({HTTPBearer: {name: 'HTTPBearer',"
-        " schema: {type: 'http', scheme: 'bearer'}, value: " + json.dumps(token) + "}}); }"
-        " setTimeout(autorizar, 500); setTimeout(autorizar, 2000); });</script>"
-    )
-    html = pagina.body.decode("utf-8").replace("</body>", autorizar + "</body>")
+    if s.app_env == "dev" and token:
+        autorizar = (
+            "<script>window.addEventListener('load', function () {"
+            " function autorizar() { ui.authActions.authorize({HTTPBearer: {name: 'HTTPBearer',"
+            " schema: {type: 'http', scheme: 'bearer'}, value: " + json.dumps(token) + "}}); }"
+            " setTimeout(autorizar, 500); setTimeout(autorizar, 2000); });</script>"
+        )
+        html = html.replace("</body>", autorizar + "</body>")
     return HTMLResponse(html)
 
 
