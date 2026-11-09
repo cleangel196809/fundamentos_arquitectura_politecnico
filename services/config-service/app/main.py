@@ -19,6 +19,7 @@ import os
 from fastapi import Depends, FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
@@ -220,11 +221,14 @@ _bearer = HTTPBearer(auto_error=False, description="Token de la API: valor de PI
 
 
 async def verificar_token(credenciales: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> None:
-    """Exige 'Authorization: Bearer <PISHOP_API_TOKEN>' en todo /config/*. Las sondas /health quedan libres."""
+    """Si PISHOP_API_TOKEN está definido, exige 'Authorization: Bearer <token>' en todo /config/*.
+
+    Sin token configurado la API es PÚBLICA (modo de prueba: Swagger sin candados).
+    Las sondas /health siempre quedan libres.
+    """
     esperado = get_settings().api_token.get_secret_value()
     if not esperado:
-        # Falla cerrada: sin token configurado nadie usa la API (en vez de quedar abierta).
-        raise _error(503, "La API no tiene token configurado: defina PISHOP_API_TOKEN", "TOKEN_NO_CONFIGURADO")
+        return  # modo público: no se exige token
     recibido = credenciales.credentials if credenciales else ""
     # compare_digest compara en tiempo constante (evita ataques de temporización).
     if not recibido or not secrets.compare_digest(recibido.encode(), esperado.encode()):
@@ -236,6 +240,20 @@ async def verificar_token(credenciales: HTTPAuthorizationCredentials | None = De
 
 
 CON_TOKEN = [Depends(verificar_token)]
+
+
+def openapi_segun_modo() -> dict:
+    """OpenAPI sin candados en modo público; con esquema Bearer solo si hay token configurado."""
+    esquema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+    if not get_settings().api_token.get_secret_value():
+        esquema.get("components", {}).pop("securitySchemes", None)
+        for operaciones in esquema.get("paths", {}).values():
+            for operacion in operaciones.values():
+                operacion.pop("security", None)
+    return esquema
+
+
+app.openapi = openapi_segun_modo
 
 AppNombre = PathParam(
     pattern=APP_PATRON,
