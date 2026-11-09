@@ -6,6 +6,8 @@ Implementa los criterios de la semana 4 (diapositivas 23-28 y 48, Reto 4.1):
   - Respaldo por polling periódico (cada 15 s) si el servidor no soporta long-polling o falla.
   - Cabecera If-None-Match con ETag: si responde 304 Not Modified no toca el estado.
   - Timeout explícito con httpx.AsyncClient (regla 4 del contrato).
+  - Token de la API: envía "Authorization: Bearer <token>". El token llega por
+    parámetro o por la variable de entorno PISHOP_CONFIG_SERVICE_TOKEN (nunca en código).
   - Tolerancia a fallo: si el config-service está caído al arrancar o durante un
     refresco, el servicio NO muere; conserva los defaults o la última versión
     conocida en caché local y registra el incidente en el log.
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Callable
 
 import httpx
@@ -38,6 +41,7 @@ class ConfigClient:
         poll_seconds: float = 15.0,
         timeout_seconds: float = 2.0,
         espera_seconds: float = 25.0,
+        api_token: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         estado_externo: dict[str, Any] | None = None,
         on_update: Callable[[int, dict[str, Any]], None] | None = None,
@@ -49,6 +53,7 @@ class ConfigClient:
         self.poll_seconds = poll_seconds
         self.timeout_seconds = timeout_seconds
         self.espera_seconds = espera_seconds  # long-polling; 0 = polling clásico
+        self._api_token = api_token if api_token is not None else os.environ.get("PISHOP_CONFIG_SERVICE_TOKEN", "")
         self._transport = transport
         self._estado_externo = estado_externo
         self._on_update = on_update
@@ -80,6 +85,8 @@ class ConfigClient:
         (en cuyo caso conserva la versión previa o los defaults).
         """
         cabeceras = {"If-None-Match": self.etag} if self.etag else {}
+        if self._api_token:
+            cabeceras["Authorization"] = f"Bearer {self._api_token}"
         url = f"{self.base_url}/config/{self.service_name}/{self.app_env}"
         params = {"esperar": esperar} if (esperar > 0 and self.etag) else None
         # Timeout explícito: conexión = timeout_seconds; lectura = espera del long-poll + margen.
@@ -152,9 +159,13 @@ async def refrescar(
     env: str,
     timeout_s: float = 2.0,
     transport: httpx.AsyncBaseTransport | None = None,
+    token: str | None = None,
 ) -> None:
     """Función compatible con la Demo 1 (4/4) de la semana 4."""
     cab = {"If-None-Match": ESTADO["etag"]} if ESTADO["etag"] else {}
+    token = token if token is not None else os.environ.get("PISHOP_CONFIG_SERVICE_TOKEN", "")
+    if token:
+        cab["Authorization"] = f"Bearer {token}"
     async with httpx.AsyncClient(timeout=timeout_s, transport=transport) as c:
         r = await c.get(f"{base.rstrip('/')}/config/{app}/{env}", headers=cab)
     if r.status_code != 304:
