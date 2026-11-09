@@ -18,7 +18,8 @@ import os
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Path as PathParam, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -40,7 +41,10 @@ Valor = Union[str, int, float, bool, None]
 class Publicacion(BaseModel):
     """Cuerpo de PUT /config/{app}/{env}."""
 
-    data: dict[str, Valor] = Field(description="Parámetros planos clave → valor (sin secretos)")
+    data: dict[str, Valor] = Field(
+        description="Parámetros planos clave → valor (sin secretos)",
+        examples=[{"pagina_tamano": 80, "timeout_inventario_s": 1.2, "flag_promos_navidad": True}],
+    )
     motivo: str = Field(
         default="actualización de configuración",
         min_length=3,
@@ -96,7 +100,34 @@ async def lifespan(app: FastAPI):
     ESTADO["repo"] = None
 
 
-app = FastAPI(title=settings.service_name, version="1.0.0", lifespan=lifespan)
+app = FastAPI(title=settings.service_name, version="1.0.0", lifespan=lifespan, docs_url=None)
+
+
+# ---------- Swagger UI listo para probar ----------
+@app.get("/docs", include_in_schema=False)
+def documentacion() -> HTMLResponse:
+    """Swagger con los campos editables desde el inicio ("Try it out" activo) y ejemplos precargados.
+
+    Solo en el entorno dev llega ya autorizado con el token de la API para que las pruebas
+    no pidan la clave; en qa/stg/prod hay que pulsar "Authorize" y escribirla.
+    """
+    s = get_settings()
+    pagina = get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{s.service_name} - Swagger UI",
+        swagger_ui_parameters={"tryItOutEnabled": True, "persistAuthorization": True},
+    )
+    token = s.api_token.get_secret_value()
+    if s.app_env != "dev" or not token:
+        return pagina
+    autorizar = (
+        "<script>window.addEventListener('load', function () {"
+        " function autorizar() { ui.authActions.authorize({HTTPBearer: {name: 'HTTPBearer',"
+        " schema: {type: 'http', scheme: 'bearer'}, value: " + json.dumps(token) + "}}); }"
+        " setTimeout(autorizar, 500); setTimeout(autorizar, 2000); });</script>"
+    )
+    html = pagina.body.decode("utf-8").replace("</body>", autorizar + "</body>")
+    return HTMLResponse(html)
 
 
 # ---------- errores con el formato del contrato: {"detalle", "codigo"} ----------
@@ -206,8 +237,16 @@ async def verificar_token(credenciales: HTTPAuthorizationCredentials | None = De
 
 CON_TOKEN = [Depends(verificar_token)]
 
-AppNombre = PathParam(pattern=APP_PATRON, description="Nombre del servicio, p. ej. catalogo-service")
-Entorno = PathParam(pattern=ENV_PATRON, description="dev | qa | stg | prod")
+AppNombre = PathParam(
+    pattern=APP_PATRON,
+    description="Nombre del servicio, p. ej. catalogo-service",
+    openapi_examples={"catalogo": {"summary": "catalogo-service", "value": "catalogo-service"}},
+)
+Entorno = PathParam(
+    pattern=ENV_PATRON,
+    description="dev | qa | stg | prod",
+    openapi_examples={"prod": {"summary": "prod", "value": "prod"}, "dev": {"summary": "dev", "value": "dev"}},
+)
 
 
 # ---------- API de configuración ----------
@@ -257,7 +296,13 @@ async def publicar(
     cuerpo: Publicacion,
     app_name: str = AppNombre,
     env: str = Entorno,
-    x_autor: str = Header(..., min_length=2, max_length=64, description="Autor del cambio (auditoría)"),
+    x_autor: str = Header(
+        ...,
+        min_length=2,
+        max_length=64,
+        description="Autor del cambio (auditoría)",
+        openapi_examples={"autor": {"summary": "fnavarro", "value": "fnavarro"}},
+    ),
     x_write_token: str | None = Header(default=None, include_in_schema=False),
 ) -> dict[str, Any]:
     autor = _validar_escritura(x_autor, x_write_token)
