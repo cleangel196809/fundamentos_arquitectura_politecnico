@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-11-08T00:00:00.000Z" agent="draw.io" version="24.7.17" type="device">
+  <diagram id="02-caso-de-uso-especifico" name="02 Caso de Uso Especifico">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama UML de Caso de Uso Específico — CU-03: Publicar y Recargar Configuración en Caliente con Rollback
+Autor: Francisco Navarro · P08 config-service · Trazabilidad ISO 9001 §7.5 e ISO/IEC 25010" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="sys2" value="Frontera del Caso de Uso Específico CU-03 (config-service + config_client.py)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="250" y="85" width="680" height="470" as="geometry"/></mxCell>
+        <mxCell id="a_arq" value="Arquitecto / DevOps
+(Actor Primario)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="175" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="a_cli" value="Microservicio Cliente
+(catalogo-service)
+(Actor Secundario)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="385" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="a_sqlite" value="SQLite Propia
+(config_versiones)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1040" y="260" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="uce_main" value="CU-03: Publicar versión de
+configuración y propagar
+en caliente (&lt;= 15 s)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="50" y="60" width="250" height="80" as="geometry"/></mxCell>
+        <mxCell id="uce_val" value="Validar cabecera X-Autor,
+motivo (3..256 chars) y
+esquema Pydantic" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="50" width="265" height="70" as="geometry"/></mxCell>
+        <mxCell id="uce_ins" value="Calcular MAX(version)+1
+e insertar fila inmutable
+con timestamp UTC" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="145" width="265" height="75" as="geometry"/></mxCell>
+        <mxCell id="uce_etag" value="Emitir cabecera ETag: "vN"
+y responder 201 Created" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="245" width="265" height="65" as="geometry"/></mxCell>
+        <mxCell id="uce_poll" value="Polling cada 15 s con
+If-None-Match (304 / 200
+recarga en caliente)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="50" y="260" width="250" height="80" as="geometry"/></mxCell>
+        <mxCell id="uce_err" value="Rechazar con 422 AUTOR_VACIO
+o 401 NO_AUTORIZADO" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="50" y="165" width="250" height="65" as="geometry"/></mxCell>
+        <mxCell id="uce_fb" value="Degradar a caché local o
+defaults ante caída HTTP
+(tolerancia a fallos)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="345" width="265" height="75" as="geometry"/></mxCell>
+        <mxCell id="es1" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="a_arq" target="uce_main"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es2" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="a_cli" target="uce_poll"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es3" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="uce_ins" target="a_sqlite"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es4" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_main" target="uce_val"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es5" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_main" target="uce_ins"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es6" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_main" target="uce_etag"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es7" value="&lt;&lt;extend&gt;&gt;
+[sin X-Autor o token inválido]" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_err" target="uce_main"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es8" value="&lt;&lt;extend&gt;&gt;
+[ETag distinto != 304]" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_poll" target="uce_etag"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es9" value="&lt;&lt;extend&gt;&gt;
+[timeout / error 5xx]" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_fb" target="uce_poll"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ficha" value="FICHA DE ESPECIFICACIÓN DEL CASO DE USO CU-03
+• ID y Nombre: CU-03 — Publicar versión de configuración auditada y recargar en caliente.
+• Actor primario: Arquitecto / Operador DevOps · Actor secundario: Microservicio cliente (config_client.py).
+• Precondiciones: config-service activo en :8010 con esquema SQLite creado y semilla seed.json cargada.
+• Flujo principal: (1) El operador envía PUT /config/{app}/{env} con cabecera X-Autor y JSON {data, motivo}. (2) El servicio valida X-Autor y el cuerpo Pydantic. (3) En transacción atómica obtiene COALESCE(MAX(version),0)+1 e inserta fila en config_versiones. (4) Retorna 201 Created con ETag: "vN". (5) En el siguiente ciclo (&lt;=15 s), config_client.py envía If-None-Match, recibe 200 OK con el nuevo ETag y actualiza ESTADO en memoria sin reiniciar.
+• Flujos alternos: (3a) Falta X-Autor o viene vacío -&gt; 422 VALIDACION / AUTOR_VACIO. (3b) Token inválido -&gt; 401 NO_AUTORIZADO. (5a) Si la versión no cambió -&gt; 304 Not Modified. (5b) Si config-service cae -&gt; ConfigClient conserva la última versión válida o defaults.
+• Postcondiciones: Nueva versión vN persistida de forma inmutable (cumple ISO 9001 §7.5 e ISO/IEC 25010 Fiabilidad y Trazabilidad)." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="40" y="575" width="1180" height="240" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

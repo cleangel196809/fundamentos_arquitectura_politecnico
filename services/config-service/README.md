@@ -61,7 +61,21 @@ Todos los servicios de PiShop Cloud resuelven su configuración con la misma jer
 
 ---
 
-## 5. Diagrama UML de secuencia: arranque, *polling* con `ETag`, recarga en caliente y *rollback*
+## 5. Diagramas UML y de Arquitectura (Mermaid + Archivos `.drawio` para draw.io)
+
+Dentro de la carpeta [`diagramas/`](diagramas/) de este paquete se incluyen todos los diagramas en formato nativo **`.drawio`** (listos para abrir en https://app.diagrams.net o en la aplicación de escritorio **draw.io**):
+
+| Archivo en `services/config-service/diagramas/` | Vista UML / Arquitectónica |
+|---|---|
+| [`00_TODOS_LOS_DIAGRAMAS_P08.drawio`](diagramas/00_TODOS_LOS_DIAGRAMAS_P08.drawio) | **Libro multipágina** con los 6 diagramas en pestañas dentro de un solo archivo `.drawio`. |
+| [`01_casos_de_uso_general.drawio`](diagramas/01_casos_de_uso_general.drawio) | **Diagrama de Casos de Uso General** (actores: Microservicio Cliente, Arquitecto/Operador DevOps, Consul/Healthcheck, GitOps `seed.json`, SQLite; `CU-01` a `CU-09`). |
+| [`02_caso_de_uso_especifico.drawio`](diagramas/02_caso_de_uso_especifico.drawio) | **Diagrama de Caso de Uso Específico (`CU-03`)** con relaciones `<<include>>`, `<<extend>>` y ficha técnica completa de precondiciones, flujo principal, alternos y postcondiciones. |
+| [`03_orientado_a_eventos.drawio`](diagramas/03_orientado_a_eventos.drawio) | **Diagrama Orientado a Eventos (EDA)**: productores, eventos (`ConfigSembrada`, `ConfigVersionPublicada`, `ConfigRevertida`, `PedidoCreado`), registro *append-only*, `ETag` y reacción *hot reload* en clientes. |
+| [`04_secuencia.drawio`](diagramas/04_secuencia.drawio) | **Diagrama UML de Secuencia**: arranque `lifespan`, *polling* con `If-None-Match` (`304`), `PUT` auditado con `X-Autor`, recarga en caliente y `POST /rollback/{v}`. |
+| [`05_clases_y_mer.drawio`](diagramas/05_clases_y_mer.drawio) | **Diagrama UML de Clases y Modelo Entidad-Relación (MER)**: `Settings`, `Publicacion`, `Repositorio`, `VersionConfig`, `ConfigClient` y tabla física SQLite `config_versiones`. |
+| [`06_actividades.drawio`](diagramas/06_actividades.drawio) | **Diagrama UML de Actividades** con 3 carriles (*swimlanes*: Cliente, API FastAPI y SQLite) y decisiones para `GET`, `PUT`/`Rollback`, `304`, `404`, `422` y tolerancia a fallos. |
+
+### 5.1 Vista rápida en Mermaid — Secuencia de arranque, *polling* con `ETag`, recarga en caliente y *rollback*
 
 ```mermaid
 sequenceDiagram
