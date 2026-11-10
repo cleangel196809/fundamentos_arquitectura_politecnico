@@ -7,7 +7,7 @@
 
 ## Acceso rápido (con el servicio corriendo)
 
-Arranque el servicio (sección 7.1) y abra:
+**En Windows, lo más fácil:** doble clic en `services/config-service/iniciar_windows.bat`. Crea el entorno, instala dependencias, arranca el servicio con el token de prueba y abre Swagger solo. Al arrancar, la consola muestra todas estas direcciones para abrirlas con **Ctrl + clic**. También se puede arrancar a mano (sección 7.1).
 
 | Qué | Enlace |
 |---|---|
@@ -183,6 +183,8 @@ await cliente_cfg.detener()
 ## 7. Cómo ejecutar y verificar
 
 ### 7.1 Ejecución local
+
+Opción rápida en Windows: doble clic en `iniciar_windows.bat` (esta misma carpeta). Opción manual:
 
 ```bash
 cd services/config-service
