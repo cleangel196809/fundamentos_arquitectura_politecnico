@@ -7,7 +7,7 @@
 
 ## Acceso rápido (con el servicio corriendo)
 
-**En Windows, lo más fácil:** doble clic en `services/config-service/iniciar_windows.bat`. Crea el entorno, instala dependencias, arranca el servicio con el token de prueba y abre Swagger solo. Al arrancar, la consola muestra todas estas direcciones para abrirlas con **Ctrl + clic**. También se puede arrancar a mano (sección 7.1).
+**En Windows, lo más fácil:** doble clic en `services/config-service/iniciar_windows.bat`. Crea el entorno, instala dependencias, arranca el servicio con el token de prueba y abre Swagger solo. Al arrancar, la consola muestra todas estas direcciones para abrirlas con **Ctrl + clic**. **Con VS Code:** *Archivo → Abrir carpeta* → `services/config-service` → **F5** (la primera vez instala dependencias; luego arranca y abre Swagger solo; requiere la extensión Python de Microsoft). También se puede arrancar a mano (sección 7.1).
 
 | Qué | Enlace |
 |---|---|
