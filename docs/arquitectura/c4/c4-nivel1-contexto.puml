@@ -1,0 +1,28 @@
+@startuml c4-nivel1-contexto
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Diagrama de Contexto del Sistema (C4 Nivel 1) — Ecosistema Digital Politécnico
+
+Person(cliente, "Cliente / Comprador", "Usuario que navega por el catálogo, gestiona su carrito e inicia el proceso de checkout desde la web o móvil.")
+Person(operador, "Operador de Finanzas y Analítica", "Usuario interno que supervisa métricas de venta, audita pagos, gestiona cancelaciones y reembolsos.")
+
+Enterprise_Boundary(b0, "Ecosistema Institucional Politécnico") {
+    System(sistema_ecommerce, "Plataforma Distribuida de Comercio y Pagos (fundamentos_arquitectura_politecnico)", "Ecosistema de microservicios con persistencia aislada, orquestación de sagas distribuidas, catálogo, inventario, pedidos y liquidación de pagos.")
+}
+
+System_Ext(pasarela_pago, "Pasarela de Pagos Externa (Stripe / PSE / Simulador)", "Servicio financiero externo que autoriza cobros bancarios y valida fondos monetarios.")
+System_Ext(proveedor_notif, "Proveedor de Notificaciones (Twilio / SendGrid / SMTP)", "Servicio externo para el despacho de correos electrónicos y mensajes SMS transaccionales.")
+System_Ext(erp_legado, "ERP Financiero / DIAN", "Sistema corporativo institucional de facturación electrónica y contabilidad central.")
+
+Rel(cliente, sistema_ecommerce, "Navega catálogo, compra productos y consulta pedidos", "HTTPS / JSON REST")
+Rel(operador, sistema_ecommerce, "Consulta reportes de ventas, audita transacciones y monitorea estado", "HTTPS / Portal Admin")
+
+Rel(sistema_ecommerce, pasarela_pago, "Solicita cobros y reembolsos mediante Capa Anti-Corrupción (ACL)", "HTTPS / REST (Puerto 8004 -> Pasarela)")
+Rel(sistema_ecommerce, proveedor_notif, "Despacha notificaciones de compra confirmada y alertas de transacción", "HTTPS / Webhook")
+Rel(sistema_ecommerce, erp_legado, "Sincroniza comprobantes fiscales y estados contables", "SFTP / Batch REST")
+
+Rel_Back(cliente, proveedor_notif, "Recibe confirmaciones de orden y recibos de pago", "SMTP / SMS")
+
+@enduml
