@@ -5,6 +5,19 @@
 - **Docente:** Edgar Humberto Angel Millán
 - **Paquete:** P08 (`services/config-service`, puerto `8010`) · **Indicador:** 1.2 (escalamiento en la nube) y 1.4 (modelamiento UML)
 
+## Acceso rápido (con el servicio corriendo)
+
+Arranque el servicio (sección 7.1) y abra:
+
+| Qué | Enlace |
+|---|---|
+| **App / documentación interactiva (Swagger)** | [http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs) |
+| ¿Está vivo? (sonda *liveness*) | [http://127.0.0.1:8010/health/live](http://127.0.0.1:8010/health/live) |
+| ¿Está listo? (sonda *readiness*) | [http://127.0.0.1:8010/health/ready](http://127.0.0.1:8010/health/ready) |
+| Contrato OpenAPI (JSON) | [http://127.0.0.1:8010/openapi.json](http://127.0.0.1:8010/openapi.json) |
+
+Token de prueba (entorno `dev`): `pishop-dev-2026` — en `dev` Swagger ya abre autorizado. Los enlaces apuntan al propio PC (`127.0.0.1`), por eso solo abren mientras el servicio está corriendo.
+
 ---
 
 ## 1. Propósito arquitectónico
