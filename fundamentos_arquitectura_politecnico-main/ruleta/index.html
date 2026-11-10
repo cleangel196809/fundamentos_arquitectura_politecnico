@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ruleta PiShop Cloud — Parcial 1</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1c2330;--mut:#5d6778;--line:#dfe3ea;--acc:#1f5eff;--ok:#0a7d4f}
+  @media (prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--ink:#e8ecf3;--mut:#9aa4b5;--line:#2c3441;--acc:#6b9bff;--ok:#4cc38a}}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:18px 16px 4px;max-width:1100px;margin:auto} h1{margin:0;font-size:1.4rem} .sub{color:var(--mut);font-size:.92rem}
+  main{max-width:1100px;margin:auto;padding:12px 16px 40px;display:grid;gap:16px;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .wheelwrap{position:relative;display:flex;justify-content:center}
+  canvas{max-width:100%;height:auto}
+  .pointer{position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:26px solid var(--ink);z-index:2}
+  .turno{text-align:center;margin:10px 0 6px;font-size:1.1rem} .turno b{color:var(--acc)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;border-radius:9px;cursor:pointer}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600;font-size:1.05rem;padding:11px 26px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  textarea{width:100%;min-height:150px;font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
+  label.opt{display:flex;gap:8px;align-items:center;font-size:.92rem;margin:8px 0}
+  table{width:100%;border-collapse:collapse;font-size:.93rem} th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600} td.rol{font-weight:700;color:var(--ok)} h2{margin:0 0 8px;font-size:1.05rem}
+  .res{margin-top:10px;padding:10px;border-radius:9px;background:var(--bg);border:1px dashed var(--line);min-height:56px;text-align:center}
+  .small{color:var(--mut);font-size:.85rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ruleta PiShop Cloud · Parcial 1</h1>
+  <div class="sub">Fundamentos de Arquitectura (1419) · reparto de los 12 paquetes de trabajo · entrega martes 10 de noviembre de 2026, 13:00</div>
+</header>
+<main>
+  <section class="card">
+    <div class="wheelwrap"><div class="pointer"></div><canvas id="rueda" width="560" height="560" aria-label="Ruleta de paquetes"></canvas></div>
+    <div class="turno" id="turno"></div>
+    <div class="row"><button class="primary" id="girar">Girar</button><button id="deshacer" title="Quita la última asignación">Deshacer última</button></div>
+    <div class="res" id="res" aria-live="polite">Pulse “Girar” para asignar el siguiente paquete.</div>
+  </section>
+  <section style="display:grid;gap:16px;align-content:start">
+    <div class="card">
+      <h2>Participantes (uno por línea)</h2>
+      <textarea id="nombres" spellcheck="false">Estudiante 01
+Estudiante 02
+Estudiante 03
+Estudiante 04
+Estudiante 05
+Estudiante 06
+Estudiante 07
+Estudiante 08
+Estudiante 09
+Estudiante 10
+Estudiante 11
+Estudiante 12</textarea>
+      <label class="opt"><input type="checkbox" id="orden" checked> Sortear también el orden de los turnos</label>
+      <div class="row" style="justify-content:flex-start"><button id="aplicar">Aplicar lista y reiniciar</button></div>
+      <div class="small">La lista debe tener 12 nombres, uno por cada paquete P01–P12.</div>
+    </div>
+    <div class="card">
+      <h2>Asignaciones</h2>
+      <table><thead><tr><th>Paquete</th><th>Responsable</th><th>Entregable</th></tr></thead><tbody id="tabla"></tbody></table>
+      <div class="row" style="justify-content:flex-start;margin-top:10px">
+        <button id="csv">Descargar CSV</button><button id="copiar">Copiar tabla</button>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+const PAQUETES = [
+ ["P01","Catálogo","catalogo-service"],["P02","Inventario","inventario-service"],["P03","Pedidos + Outbox","pedidos-service"],
+ ["P04","Pagos + ACL","pagos-service"],["P05","Notificaciones","notificaciones-service"],["P06","Checkout BFF + Saga","checkout-bff"],
+ ["P07","API pública","api-publica"],["P08","Config service","config-service"],["P09","Registro y descubrimiento","descubridor-service + Consul"],
+ ["P10","Reportes (CQRS)","reportes-service"],["P11","Arquitecto (C4/UML/ADR)","docs/arquitectura"],["P12","Confiabilidad, e2e y CI","retos/ + compose + CI"]
+];
+const COLORES=["#1f5eff","#e4572e","#17a398","#f3a712","#7b4fd1","#2e933c","#d6336c","#0b7285","#a26b00","#5c6bc0","#c2410c","#3b7a57"];
+let turnos=[], asign=[], libres=[], angulo=0, girando=false;
+const $=id=>document.getElementById(id), cv=$("rueda"), g=cv.getContext("2d");
+
+function aleatorio(n){ const b=new Uint32Array(1), lim=Math.floor(2**32/n)*n; let x; do{crypto.getRandomValues(b); x=b[0];}while(x>=lim); return x%n; }
+function barajar(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=aleatorio(i+1); [a[i],a[j]]=[a[j],a[i]];} return a; }
+
+function reiniciar(){
+  const nombres=$("nombres").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  turnos=$("orden").checked?barajar(nombres):nombres; asign=[]; libres=PAQUETES.map((_,i)=>i); angulo=0;
+  if(nombres.length!==12) $("res").textContent="Atención: hay "+nombres.length+" nombres; se esperan 12.";
+  else $("res").textContent="Pulse “Girar” para asignar el siguiente paquete.";
+  pintar();
+}
+function pintar(){
+  const n=libres.length, W=cv.width, c=W/2, r=c-8; g.clearRect(0,0,W,W);
+  if(n===0){ g.fillStyle="#888"; g.font="600 28px system-ui"; g.textAlign="center"; g.fillText("Reparto completo",c,c); }
+  else {
+    const arco=2*Math.PI/n;
+    libres.forEach((idx,k)=>{
+      const a0=angulo+k*arco-Math.PI/2;
+      g.beginPath(); g.moveTo(c,c); g.arc(c,c,r,a0,a0+arco); g.closePath();
+      g.fillStyle=COLORES[idx%COLORES.length]; g.fill(); g.strokeStyle="#fff"; g.lineWidth=2; g.stroke();
+      g.save(); g.translate(c,c); g.rotate(a0+arco/2); g.textAlign="right"; g.fillStyle="#fff";
+      g.font="700 "+(n>8?22:26)+"px system-ui"; g.fillText(PAQUETES[idx][0],r-18,-2);
+      g.font="500 "+(n>8?14:16)+"px system-ui"; g.fillText(PAQUETES[idx][1].slice(0,24),r-18,18); g.restore();
+    });
+  }
+  g.beginPath(); g.arc(c,c,26,0,7); g.fillStyle="#fff"; g.fill(); g.strokeStyle="#ccc"; g.stroke();
+  const sig=turnos[asign.length];
+  $("turno").innerHTML=sig?("Turno de <b>"+esc(sig)+"</b> ("+(asign.length+1)+" de "+turnos.length+")"):(turnos.length?"Todos tienen paquete.":"");
+  $("girar").disabled=girando||!sig||libres.length===0;
+  $("deshacer").disabled=girando||asign.length===0;
+  $("tabla").innerHTML=asign.map(a=>"<tr><td class='rol'>"+a.paq[0]+"</td><td>"+esc(a.nombre)+"</td><td>"+esc(a.paq[1])+"<br><span class='small'>"+esc(a.paq[2])+"</span></td></tr>").join("")||"<tr><td colspan='3' class='small'>Sin asignaciones todavía</td></tr>";
+}
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
+
+function girar(){
+  if(girando||libres.length===0||!turnos[asign.length]) return;
+  girando=true; $("girar").disabled=true;
+  const n=libres.length, arco=2*Math.PI/n, k=aleatorio(n);           // sector ganador (aleatorio criptográfico)
+  const jitter=(aleatorio(80)+10)/100*arco;                          // punto de parada dentro del sector
+  const objetivo=-(k*arco+jitter);                                    // el puntero queda en -90°, sector k bajo el puntero
+  const base=((angulo%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+  let destino=objetivo-(2*Math.PI)*(5+aleatorio(3)); while(destino>angulo-2*Math.PI*4) destino-=2*Math.PI;
+  const ini=angulo, dur=4200, t0=performance.now();
+  (function paso(t){
+    const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,4);
+    angulo=ini+(destino-ini)*e; pintar();
+    if(p<1) requestAnimationFrame(paso);
+    else { const paq=libres[k], nombre=turnos[asign.length]; asign.push({nombre,paq:PAQUETES[paq],idx:paq});
+      libres.splice(k,1); angulo=0; girando=false;
+      $("res").innerHTML="<b>"+esc(nombre)+"</b> → <b>"+PAQUETES[paq][0]+" · "+esc(PAQUETES[paq][1])+"</b><br><span class='small'>"+esc(PAQUETES[paq][2])+"</span>"; pintar(); }
+  })(t0);
+}
+function deshacer(){ const a=asign.pop(); if(!a) return; libres.push(a.idx); libres.sort((x,y)=>x-y); $("res").textContent="Se deshizo la asignación de "+a.nombre+" ("+a.paq[0]+")."; pintar(); }
+function filas(){ return asign.slice().sort((a,b)=>a.paq[0].localeCompare(b.paq[0])).map(a=>[a.paq[0],a.nombre,a.paq[1],a.paq[2]]); }
+function csv(){
+  const lineas=[["paquete","responsable","rol","entregable"]].concat(filas()).map(f=>f.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(","));
+  const b=new Blob(["﻿"+lineas.join("\n")],{type:"text/csv;charset=utf-8"}), a=document.createElement("a");
+  a.href=URL.createObjectURL(b); a.download="asignacion-parcial1.csv"; a.click(); URL.revokeObjectURL(a.href);
+}
+async function copiar(){ const t=filas().map(f=>f.join("\t")).join("\n"); try{await navigator.clipboard.writeText(t); $("res").textContent="Tabla copiada.";}catch(e){$("res").textContent="No se pudo copiar; use Descargar CSV.";} }
+$("girar").onclick=girar; $("deshacer").onclick=deshacer; $("aplicar").onclick=reiniciar; $("csv").onclick=csv; $("copiar").onclick=copiar;
+reiniciar();
+</script>
+</body>
+</html>

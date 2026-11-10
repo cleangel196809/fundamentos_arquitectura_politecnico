@@ -1,0 +1,90 @@
+{
+  "_comentario": "Contrato mínimo por servicio. El validador comprueba que cada ruta+método exista en /openapi.json y que las tres sondas de salud respondan. Puertos fijados en la semana 2.",
+  "servicios": {
+    "catalogo-service": {
+      "rol": "P01", "puerto": 8001,
+      "endpoints": [
+        ["GET", "/v1/productos"],
+        ["POST", "/v1/productos"],
+        ["GET", "/v1/productos/{sku}"],
+        ["PATCH", "/v1/productos/{sku}/publicar"]
+      ]
+    },
+    "inventario-service": {
+      "rol": "P02", "puerto": 8002,
+      "endpoints": [
+        ["GET", "/v1/stock/{sku}"],
+        ["PUT", "/v1/stock/{sku}"],
+        ["POST", "/v1/reservas"],
+        ["POST", "/v1/reservas/{reserva_id}/liberar"]
+      ]
+    },
+    "pedidos-service": {
+      "rol": "P03", "puerto": 8003,
+      "endpoints": [
+        ["POST", "/v1/pedidos"],
+        ["GET", "/v1/pedidos/{pedido_id}"],
+        ["POST", "/v1/pedidos/{pedido_id}/cancelar"],
+        ["GET", "/v1/outbox/pendientes"]
+      ]
+    },
+    "pagos-service": {
+      "rol": "P04", "puerto": 8004,
+      "endpoints": [
+        ["POST", "/v1/pagos"],
+        ["GET", "/v1/pagos/{pago_id}"],
+        ["POST", "/v1/pagos/{pago_id}/reembolso"],
+        ["POST", "/_simulador/pasarela/cobrar"]
+      ]
+    },
+    "notificaciones-service": {
+      "rol": "P05", "puerto": 8005,
+      "endpoints": [
+        ["GET", "/v1/notificaciones"],
+        ["POST", "/v1/notificaciones/prueba"]
+      ]
+    },
+    "reportes-service": {
+      "rol": "P10", "puerto": 8006,
+      "endpoints": [
+        ["GET", "/v1/reportes/resumen"],
+        ["GET", "/v1/reportes/ventas-por-sku"],
+        ["POST", "/v1/reportes/reconstruir"]
+      ]
+    },
+    "checkout-bff": {
+      "rol": "P06", "puerto": 8080,
+      "endpoints": [
+        ["POST", "/v1/checkout"],
+        ["GET", "/v1/checkout/{pedido_id}/estado"],
+        ["GET", "/v1/vitrina"]
+      ]
+    },
+    "api-publica": {
+      "rol": "P07", "puerto": 8000,
+      "endpoints": [
+        ["GET", "/v1/catalogo/productos"],
+        ["POST", "/v1/compras"],
+        ["GET", "/v1/compras/{pedido_id}"]
+      ]
+    },
+    "config-service": {
+      "rol": "P08", "puerto": 8010,
+      "endpoints": [
+        ["GET", "/config/{app_name}/{env}"],
+        ["PUT", "/config/{app_name}/{env}"],
+        ["GET", "/config/{app_name}/{env}/versions"],
+        ["POST", "/config/{app_name}/{env}/rollback/{version}"]
+      ]
+    },
+    "descubridor-service": {
+      "rol": "P09", "puerto": 8090,
+      "endpoints": [
+        ["GET", "/v1/servicios"],
+        ["GET", "/v1/servicios/{nombre}/instancias"],
+        ["GET", "/v1/servicios/{nombre}/resolver"]
+      ]
+    }
+  },
+  "sondas": ["/health/live", "/health/ready", "/health/startup"]
+}
