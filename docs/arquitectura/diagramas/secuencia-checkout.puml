@@ -1,0 +1,78 @@
+@startuml secuencia-checkout
+autonumber
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam boxPadding 10
+skinparam participantPadding 10
+
+title Diagrama de Secuencia UML: Checkout Síncrono vs. Asíncrono
+
+actor "Cliente / App" as Cliente
+participant "Checkout BFF\n(P06: 8080)" as BFF
+participant "Pedidos Service\n(P03: 8003)" as Pedidos
+database "pedidos_db\n(PostgreSQL)" as PedidosDB
+queue "RabbitMQ Broker\n(AMQP 5672)" as Broker
+participant "Inventario Service\n(P02: 8002)" as Inventario
+participant "Pagos Service\n(P04: 8004)" as Pagos
+participant "Simulador Pasarela\n(API Externa)" as Pasarela
+participant "Notificaciones\n(P05: 8005)" as Notif
+
+== FASE 1: INTERACCIÓN SÍNCRONA (Borde / Latencia < 200 ms) ==
+Cliente -> BFF: POST /v1/checkout {cliente_id, sku, cantidad, tarjeta_token}
+activate BFF
+BFF -> Pedidos: POST /v1/pedidos {cliente_id, sku, cantidad}
+activate Pedidos
+
+Pedidos -> Pedidos: Validar estructura y reglas básicas
+Pedidos -> PedidosDB: INSERT INTO pedidos (id, estado='PENDIENTE_PAGO')
+activate PedidosDB
+PedidosDB --> Pedidos: Confirmado (id: "PED-789")
+deactivate PedidosDB
+
+Pedidos -> Broker: Publicar evento 'PedidoIniciado' (Outbox)
+Pedidos --> BFF: 202 Accepted {pedido_id: "PED-789", estado: "PENDIENTE_PAGO"}
+deactivate Pedidos
+BFF --> Cliente: 202 Accepted {pedido_id: "PED-789", estado: "PENDIENTE_PAGO"}
+deactivate BFF
+
+== FASE 2: ORQUESTACIÓN ASÍNCRONA DE LA SAGA (Event-Driven AMQP) ==
+
+Broker -> Inventario: Evento: PedidoIniciado
+activate Inventario
+Inventario -> Inventario: POST /v1/reservas (Reserva atómica de SKU)
+Inventario -> Broker: Publicar evento 'StockReservado' {reserva_id: "RES-101"}
+deactivate Inventario
+
+Broker -> Pagos: Evento: StockReservado
+activate Pagos
+Pagos -> Pagos: Verificar Idempotency-Key
+Pagos -> Pasarela: POST /_simulador/pasarela/cobrar (Vía Capa ACL)
+activate Pasarela
+Pasarela --> Pagos: 200 OK {autorizacion: "APROBADA", tx_id: "TX-999"}
+deactivate Pasarela
+
+Pagos -> Broker: Publicar evento 'PagoAprobado' {pedido_id: "PED-789"}
+deactivate Pagos
+
+Broker -> Pedidos: Evento: PagoAprobado
+activate Pedidos
+Pedidos -> PedidosDB: UPDATE pedidos SET estado='CONFIRMADO' WHERE id='PED-789'
+Pedidos -> Broker: Publicar evento 'PedidoConfirmado'
+deactivate Pedidos
+
+Broker -> Notif: Evento: PedidoConfirmado
+activate Notif
+Notif -> Notif: Despachar correo transaccional de confirmación
+deactivate Notif
+
+== CONSULTA ASÍNCRONA DE ESTADO ==
+Cliente -> BFF: GET /v1/checkout/PED-789/estado
+activate BFF
+BFF -> Pedidos: GET /v1/pedidos/PED-789
+activate Pedidos
+Pedidos --> BFF: {id: "PED-789", estado: "CONFIRMADO"}
+deactivate Pedidos
+BFF --> Cliente: 200 OK {estado: "CONFIRMADO"}
+deactivate BFF
+
+@enduml

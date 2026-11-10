@@ -1,0 +1,86 @@
+@startuml c4-nivel2-contenedores
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Diagrama de Contenedores (C4 Nivel 2) — Plataforma Distribuida de Comercio y Pagos
+
+Person(cliente, "Cliente / Comprador", "Usuario final que realiza compras mediante la aplicación.")
+Person(operador, "Operador de Finanzas / Admin", "Personal interno que analiza métricas de negocio y audita pedidos.")
+
+System_Boundary(b1, "Plataforma Distribuida (fundamentos_arquitectura_politecnico)") {
+    
+    ' Capa de Ingress y BFF
+    Container(api_publica, "API Pública [P07]", "FastAPI / Nginx (Port 8000)", "Punto de entrada unificado para clientes externos y compras públicas.")
+    Container(checkout_bff, "Checkout BFF [P06]", "FastAPI / Python (Port 8080)", "Backend for Frontend que orquesta la vitrina y la experiencia de checkout compuesta.")
+    
+    ' Servicios Transaccionales Core
+    Container(pedidos_service, "Pedidos Service [P03]", "Python (Port 8003)", "Gestiona el ciclo de vida del pedido, orquestador de Saga y Outbox Pattern.")
+    ContainerDb(pedidos_db, "Pedidos DB", "PostgreSQL 16", "Esquema y persistencia aislada de órdenes, ítems y estados.")
+
+    Container(pagos_service, "Pagos Service [P04]", "Python (Port 8004)", "Procesa cobros y reembolsos. Encapsula la Capa Anti-Corrupción (ACL) e Idempotencia.")
+    ContainerDb(pagos_db, "Pagos DB", "PostgreSQL 16", "Esquema y persistencia aislada de transacciones financieras y recibos.")
+
+    Container(inventario_service, "Inventario Service [P02]", "Python (Port 8002)", "Control de existencias físicas y reservas atómicas de SKUs.")
+    ContainerDb(inventario_db, "Inventario DB", "PostgreSQL 16", "Esquema y persistencia aislada de stock y reservas.")
+
+    ' Servicios de Soporte
+    Container(catalogo_service, "Catálogo Service [P01]", "Python (Port 8001)", "Administra la definición de productos, SKUs, categorías y publicación.")
+    ContainerDb(catalogo_db, "Catálogo DB", "PostgreSQL 16", "Esquema y persistencia aislada de productos y precios.")
+
+    Container(notificaciones_service, "Notificaciones Service [P05]", "Python (Port 8005)", "Despacho asíncrono de alertas de compra, estados y confirmaciones.")
+    ContainerDb(notificaciones_db, "Notificaciones DB", "PostgreSQL 16", "Esquema y persistencia de plantillas y bitácora de envíos.")
+
+    Container(reportes_service, "Reportes Service [P10]", "Python (Port 8006)", "Generación de resúmenes analíticos y métricas por SKU (CQRS Lectura).")
+    ContainerDb(reportes_db, "Reportes DB", "PostgreSQL 16", "Esquema optimizado para consultas de analítica y proyecciones.")
+
+    ' Servicios Genéricos y Transversales
+    Container(config_service, "Config Service [P08]", "Python (Port 8010)", "Servicio centralizado de configuración con control de versiones y rollback.")
+    ContainerDb(config_db, "Config DB", "PostgreSQL 16", "Almacenamiento de variables y versiones de configuración.")
+
+    Container(descubridor_service, "Descubridor Service [P09]", "Python (Port 8090)", "Registro dinámico de instancias y resolución de direcciones de red de servicios.")
+
+    ' Mensajería Asíncrona
+    Container(rabbitmq, "Message Broker", "RabbitMQ 3.13 (AMQP)", "Bus de eventos asíncronos para transacciones distribuidas y la orquestación de la Saga.")
+}
+
+System_Ext(pasarela_pago, "Pasarela de Pagos Externa", "API REST Externa / Simulador (/ _simulador/pasarela/cobrar)")
+System_Ext(proveedor_notif, "Proveedor de Notificaciones", "SendGrid / Twilio")
+
+' Relaciones de Clientes
+Rel(cliente, api_publica, "Navega catálogo y compra (/v1/compras)", "HTTPS / REST")
+Rel(cliente, checkout_bff, "Inicia checkout y consulta estado (/v1/checkout)", "HTTPS / REST")
+Rel(operador, reportes_service, "Consulta resúmenes (/v1/reportes/resumen)", "HTTPS / REST")
+
+' Relaciones Ingress a Servicios
+Rel(api_publica, checkout_bff, "Delega checkout", "HTTP / REST")
+Rel(api_publica, catalogo_service, "Consulta productos (/v1/catalogo/productos)", "HTTP / REST")
+Rel(checkout_bff, catalogo_service, "Consulta vitrina (/v1/vitrina)", "HTTP / REST")
+Rel(checkout_bff, pedidos_service, "Crea orden (/v1/pedidos)", "HTTP / REST")
+Rel(checkout_bff, inventario_service, "Consulta stock preliminar", "HTTP / REST")
+
+' Relaciones Microservicios a sus Bases de Datos Exclusivas (Database-per-Service)
+Rel(catalogo_service, catalogo_db, "Lee/Escribe", "TCP / PostgreSQL Wire (5432)")
+Rel(inventario_service, inventario_db, "Lee/Escribe reservas", "TCP / PostgreSQL Wire (5432)")
+Rel(pedidos_service, pedidos_db, "Lee/Escribe órdenes", "TCP / PostgreSQL Wire (5432)")
+Rel(pagos_service, pagos_db, "Lee/Escribe transacciones", "TCP / PostgreSQL Wire (5432)")
+Rel(notificaciones_service, notificaciones_db, "Lee/Escribe logs", "TCP / PostgreSQL Wire (5432)")
+Rel(reportes_service, reportes_db, "Lee/Escribe vistas", "TCP / PostgreSQL Wire (5432)")
+Rel(config_service, config_db, "Lee/Escribe versiones", "TCP / PostgreSQL Wire (5432)")
+
+' Relaciones con RabbitMQ (Event-Driven y Saga)
+Rel(pedidos_service, rabbitmq, "Publica eventos de orden y Saga (PedidoIniciado)", "AMQP 0-9-1 (Puerto 5672)")
+Rel(rabbitmq, inventario_service, "Consume eventos de reserva y liberación de stock", "AMQP 0-9-1")
+Rel(rabbitmq, pagos_service, "Consume eventos de cobro y reembolso", "AMQP 0-9-1")
+Rel(rabbitmq, notificaciones_service, "Consume eventos para despachar alertas", "AMQP 0-9-1")
+Rel(rabbitmq, reportes_service, "Consume eventos para actualizar proyecciones analíticas", "AMQP 0-9-1")
+
+' Relaciones con Componentes Externos
+Rel(pagos_service, pasarela_pago, "Ejecuta cobro a través de Capa ACL (/ _simulador/pasarela/cobrar)", "HTTPS / REST")
+Rel(notificaciones_service, proveedor_notif, "Envía email y SMS", "HTTPS / REST")
+
+' Descubridor y Config
+Rel(pedidos_service, config_service, "Obtiene configuraciones (/config)", "HTTP / REST")
+Rel(pagos_service, descubridor_service, "Resuelve instancias (/v1/servicios)", "HTTP / REST")
+
+@enduml
