@@ -1,0 +1,79 @@
+@startuml despliegue
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Diagrama de Despliegue de Infraestructura — Plataforma de Pedidos y Pagos
+
+Deployment_Node(user_device, "Dispositivo de Cliente", "Laptop / Smartphone") {
+    Container(browser, "Navegador Web / App Móvil", "React SPA / Mobile Client", "Interfaz gráfica para navegación de catálogo y flujo de compra.")
+}
+
+Deployment_Node(cloud_infra, "Infraestructura de Servidores (Host Docker Engine)", "Ubuntu Linux 24.04 LTS / Clúster de Contenedores") {
+    
+    Deployment_Node(dmz_zone, "Red Pública Perimetral (red-publica)", "Bridge Network") {
+        Container(api_gateway, "api-publica [P07]", "Docker Container (FastAPI)", "Puerto expuesto: 8000:8000. Punto de terminación SSL/TLS y enrutamiento perimetral.")
+    }
+
+    Deployment_Node(compute_zone, "Red Interna de Microservicios (red-interna)", "Bridge Network") {
+        Container(bff, "checkout-bff [P06]", "Docker Container", "Puerto: 8080. Orquesta la experiencia de checkout.")
+        Container(catalogo_app, "catalogo-service [P01]", "Docker Container", "Puerto: 8001. Gestión de catálogo de SKUs.")
+        Container(inventario_app, "inventario-service [P02]", "Docker Container", "Puerto: 8002. Control de stock y reservas.")
+        Container(pedidos_app, "pedidos-service [P03]", "Docker Container", "Puerto: 8003. Ciclo de vida de órdenes y Saga.")
+        Container(pagos_app, "pagos-service [P04]", "Docker Container", "Puerto: 8004. Procesamiento de cobros y Capa ACL.")
+        Container(notif_app, "notificaciones-service [P05]", "Docker Container", "Puerto: 8005. Despacho asíncrono de alertas.")
+        Container(reportes_app, "reportes-service [P10]", "Docker Container", "Puerto: 8006. Consultas CQRS de ventas.")
+        Container(config_app, "config-service [P08]", "Docker Container", "Puerto: 8010. Configuración centralizada.")
+        Container(descubridor_app, "descubridor-service [P09]", "Docker Container", "Puerto: 8090. Registro y resolución de red.")
+    }
+
+    Deployment_Node(broker_zone, "Nodo de Mensajería Asíncrona", "Docker Container") {
+        Container(rabbitmq, "rabbitmq-broker", "RabbitMQ 3.13 Alpine", "Puertos: 5672 (AMQP) y 15672 (Management UI).")
+    }
+
+    Deployment_Node(persistence_zone, "Capa de Persistencia Aislada (Database-per-Service)", "Volúmenes Docker Persistentes") {
+        ContainerDb(db_cat, "catalogo-db", "PostgreSQL 16", "catalogo_data -> /var/lib/postgresql/data")
+        ContainerDb(db_inv, "inventario-db", "PostgreSQL 16", "inventario_data -> /var/lib/postgresql/data")
+        ContainerDb(db_ped, "pedidos-db", "PostgreSQL 16", "pedidos_data -> /var/lib/postgresql/data")
+        ContainerDb(db_pag, "pagos-db", "PostgreSQL 16", "pagos_data -> /var/lib/postgresql/data")
+        ContainerDb(db_not, "notificaciones-db", "PostgreSQL 16", "notificaciones_data -> /var/lib/postgresql/data")
+        ContainerDb(db_rep, "reportes-db", "PostgreSQL 16", "reportes_data -> /var/lib/postgresql/data")
+        ContainerDb(db_cfg, "config-db", "PostgreSQL 16", "config_data -> /var/lib/postgresql/data")
+    }
+}
+
+Deployment_Node(external_cloud, "Proveedores Externos Cloud", "Internet / SaaS") {
+    System_Ext(ext_pasarela, "Pasarela Externa de Pagos", "Simulador Bancario / Stripe / PSE API (HTTPS REST)")
+    System_Ext(ext_email, "Servicio de Correo Cloud", "SendGrid / Twilio API (HTTPS)")
+}
+
+' Enlaces de Red
+Rel(browser, api_gateway, "Peticiones HTTPS de compra", "HTTPS / Port 8000")
+Rel(browser, bff, "Checkout interactivo", "HTTPS / Port 8080")
+
+Rel(api_gateway, bff, "Enrutamiento interno", "HTTP")
+Rel(bff, pedidos_app, "POST /v1/pedidos", "HTTP / Port 8003")
+Rel(bff, inventario_app, "GET stock", "HTTP / Port 8002")
+Rel(bff, catalogo_app, "GET vitrina", "HTTP / Port 8001")
+
+' Enlaces a Bases de Datos (1:1 Exclusivo)
+Rel(catalogo_app, db_cat, "TCP 5432", "PostgreSQL Wire")
+Rel(inventario_app, db_inv, "TCP 5432", "PostgreSQL Wire")
+Rel(pedidos_app, db_ped, "TCP 5432", "PostgreSQL Wire")
+Rel(pagos_app, db_pag, "TCP 5432", "PostgreSQL Wire")
+Rel(notif_app, db_not, "TCP 5432", "PostgreSQL Wire")
+Rel(reportes_app, db_rep, "TCP 5432", "PostgreSQL Wire")
+Rel(config_app, db_cfg, "TCP 5432", "PostgreSQL Wire")
+
+' Enlaces al Broker
+Rel(pedidos_app, rabbitmq, "Eventos Saga", "AMQP Port 5672")
+Rel(inventario_app, rabbitmq, "Eventos Reserva", "AMQP Port 5672")
+Rel(pagos_app, rabbitmq, "Eventos Cobro", "AMQP Port 5672")
+Rel(notif_app, rabbitmq, "Consumo Alertas", "AMQP Port 5672")
+Rel(reportes_app, rabbitmq, "Consumo CQRS", "AMQP Port 5672")
+
+' Integraciones Externas
+Rel(pagos_app, ext_pasarela, "POST /_simulador/pasarela/cobrar (vía ACL)", "HTTPS / REST")
+Rel(notif_app, ext_email, "Despacho Email", "HTTPS / REST")
+
+@enduml
