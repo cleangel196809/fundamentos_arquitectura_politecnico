@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install -r plantilla-servicio/requirements.txt
+      - name: Pruebas de la plantilla
+        run: cd plantilla-servicio && python -m pytest -q
+      - name: Pruebas de cada servicio implementado
+        run: |
+          for d in services/*; do
+            [ -d "$d/tests" ] || continue
+            echo "== $d"
+            pip install "httpx<0.28" fastapi pytest sqlalchemy
+            if [ -f "$d/requirements.txt" ]; then
+              pip install -r "$d/requirements.txt"
+            fi
+            (cd "$d" && python -m pytest -q) || exit 1
+          done
+      - name: Validar contratos (informativo hasta el cierre)
+        run: python herramientas/validar_entrega.py --todos || true
