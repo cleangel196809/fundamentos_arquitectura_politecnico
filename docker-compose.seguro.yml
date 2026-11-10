@@ -1,0 +1,54 @@
+# Perfil SEGURO de PiShop Cloud (rol de ciberseguridad): aislamiento de red.
+#
+# Deja publicado SOLO api-publica (8000). Consul, Redis, PostgreSQL y los servicios
+# del dominio quedan accesibles unicamente dentro de la red interna de Docker
+# (se alcanzan por nombre, p. ej. http://catalogo-service:8001, no por localhost).
+#
+# Requiere Docker Compose >= 2.24.4 (etiqueta !reset). Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.seguro.yml up -d
+#
+# No modifica docker-compose.yml (lo mantiene P12): lo que no se dice aqui se hereda.
+services:
+  consul:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  postgres:
+    ports: !reset []
+
+  adminer:
+    ports: !reset []
+
+  config-service:
+    ports: !reset []
+
+  catalogo-service:
+    ports: !reset []
+
+  inventario-service:
+    ports: !reset []
+
+  pedidos-service:
+    ports: !reset []
+
+  pagos-service:
+    ports: !reset []
+
+  notificaciones-service:
+    ports: !reset []
+
+  reportes-service:
+    ports: !reset []
+
+  descubridor-service:
+    ports: !reset []
+
+  checkout-bff:
+    ports: !reset []
+
+  api-publica:
+    environment:
+      # Fuera de dev la API exige una clave fuerte (>= 16 caracteres) en el .env
+      PISHOP_APP_ENV: ${PISHOP_APP_ENV:-dev}

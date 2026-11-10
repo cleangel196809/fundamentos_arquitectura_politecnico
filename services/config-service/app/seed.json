@@ -1,0 +1,310 @@
+{
+ "catalogo-service:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "pagina_tamano": 20,
+   "log_nivel": "DEBUG",
+   "cache_segundos": 0
+  }
+ },
+ "catalogo-service:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "pagina_tamano": 20,
+   "log_nivel": "INFO",
+   "cache_segundos": 30
+  }
+ },
+ "catalogo-service:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "pagina_tamano": 30,
+   "log_nivel": "INFO",
+   "cache_segundos": 60
+  }
+ },
+ "catalogo-service:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "pagina_tamano": 50,
+   "log_nivel": "INFO",
+   "cache_segundos": 120
+  }
+ },
+ "inventario-service:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "alerta_stock_minimo": 5,
+   "log_nivel": "DEBUG"
+  }
+ },
+ "inventario-service:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "alerta_stock_minimo": 5,
+   "log_nivel": "INFO"
+  }
+ },
+ "inventario-service:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "alerta_stock_minimo": 10,
+   "log_nivel": "INFO"
+  }
+ },
+ "inventario-service:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "alerta_stock_minimo": 10,
+   "log_nivel": "INFO"
+  }
+ },
+ "pedidos-service:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "outbox_lote_maximo": 50,
+   "log_nivel": "DEBUG"
+  }
+ },
+ "pedidos-service:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "outbox_lote_maximo": 50,
+   "log_nivel": "INFO"
+  }
+ },
+ "pedidos-service:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "outbox_lote_maximo": 100,
+   "log_nivel": "INFO"
+  }
+ },
+ "pedidos-service:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "outbox_lote_maximo": 200,
+   "log_nivel": "INFO"
+  }
+ },
+ "pagos-service:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_pasarela_segundos": 2.0,
+   "reintentos_pasarela": 0,
+   "log_nivel": "INFO"
+  }
+ },
+ "pagos-service:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_pasarela_segundos": 2.0,
+   "reintentos_pasarela": 1,
+   "log_nivel": "INFO"
+  }
+ },
+ "pagos-service:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_pasarela_segundos": 1.5,
+   "reintentos_pasarela": 1,
+   "log_nivel": "INFO"
+  }
+ },
+ "pagos-service:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_pasarela_segundos": 1.5,
+   "reintentos_pasarela": 2,
+   "log_nivel": "INFO"
+  }
+ },
+ "notificaciones-service:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "canal_por_defecto": "email",
+   "enviar_sms": false,
+   "log_nivel": "INFO"
+  }
+ },
+ "notificaciones-service:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "canal_por_defecto": "email",
+   "enviar_sms": false,
+   "log_nivel": "INFO"
+  }
+ },
+ "notificaciones-service:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "canal_por_defecto": "email",
+   "enviar_sms": false,
+   "log_nivel": "INFO"
+  }
+ },
+ "notificaciones-service:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "canal_por_defecto": "email",
+   "enviar_sms": true,
+   "log_nivel": "INFO"
+  }
+ },
+ "reportes-service:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "zona_horaria": "America/Bogota",
+   "log_nivel": "INFO"
+  }
+ },
+ "reportes-service:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "zona_horaria": "America/Bogota",
+   "log_nivel": "INFO"
+  }
+ },
+ "reportes-service:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "zona_horaria": "America/Bogota",
+   "log_nivel": "INFO"
+  }
+ },
+ "reportes-service:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "zona_horaria": "America/Bogota",
+   "log_nivel": "INFO"
+  }
+ },
+ "checkout-bff:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_inventario_segundos": 1.0,
+   "flag_promos_navidad": {
+    "enabled": true,
+    "rollout_pct": 100
+   }
+  }
+ },
+ "checkout-bff:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_inventario_segundos": 1.0,
+   "flag_promos_navidad": {
+    "enabled": true,
+    "rollout_pct": 100
+   }
+  }
+ },
+ "checkout-bff:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_inventario_segundos": 0.8,
+   "flag_promos_navidad": {
+    "enabled": true,
+    "rollout_pct": 50
+   }
+  }
+ },
+ "checkout-bff:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "timeout_inventario_segundos": 0.8,
+   "flag_promos_navidad": {
+    "enabled": false,
+    "rollout_pct": 20
+   }
+  }
+ },
+ "api-publica:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "limite_por_minuto": 40,
+   "log_nivel": "INFO"
+  }
+ },
+ "api-publica:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "limite_por_minuto": 40,
+   "log_nivel": "INFO"
+  }
+ },
+ "api-publica:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "limite_por_minuto": 40,
+   "log_nivel": "INFO"
+  }
+ },
+ "api-publica:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "limite_por_minuto": 40,
+   "log_nivel": "INFO"
+  }
+ },
+ "descubridor-service:dev": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "estrategia_balanceo": "round-robin"
+  }
+ },
+ "descubridor-service:qa": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "estrategia_balanceo": "round-robin"
+  }
+ },
+ "descubridor-service:stg": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "estrategia_balanceo": "round-robin"
+  }
+ },
+ "descubridor-service:prod": {
+  "autor": "semilla",
+  "motivo": "configuración inicial",
+  "data": {
+   "estrategia_balanceo": "round-robin"
+  }
+ }
+}

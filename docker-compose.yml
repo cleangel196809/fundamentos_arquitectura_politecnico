@@ -1,93 +1,254 @@
-# Entorno completo de PiShop Cloud. P12 es responsable de mantenerlo funcionando.
-# Cada servicio de services/<nombre>/ debe tener su Dockerfile (copiado de plantilla-servicio/).
-# Uso:  docker compose up -d        (levanta infraestructura y los servicios implementados)
-x-servicio: &servicio
+# =============================================================================
+# PiShop Cloud — sistema completo con un solo comando.
+#
+#   copy .env.example .env          (o: python scripts/generar_env.py)
+#   docker compose up -d --build
+#
+# Qué levanta:
+#   * Infraestructura: PostgreSQL 17 (6 bases, un usuario por base), Redis 8
+#     (bus de eventos con Streams) y Consul 1.21 (registro y descubrimiento).
+#   * 10 servicios FastAPI: 6 core, 1 BFF, 1 API pública y 2 de soporte.
+#
+# Puertos publicados en el computador:
+#   * 8000 (api-publica) es el ÚNICO abierto a la red: es la puerta de entrada.
+#   * El resto se publica solo en 127.0.0.1 (su propio equipo) para poder
+#     probar con curl, el validador y el e2e del docente, pero nadie más en la
+#     red Wi-Fi/LAN los alcanza. Para cerrarlos del todo use el perfil seguro:
+#       docker compose -f docker-compose.yml -f docker-compose.seguro.yml up -d
+#
+# Redes:
+#   * borde   -> solo la API pública y Consul (la parte que "mira hacia afuera").
+#   * interna -> todos los servicios, PostgreSQL y Redis. Los servicios se
+#                encuentran por NOMBRE (DNS de Docker), nunca por IP.
+# =============================================================================
+
+name: pishop-cloud
+
+# ---------------------------------------------------------------- plantillas
+# Ajustes comunes de endurecimiento y recursos para TODOS los servicios Python.
+x-endurecimiento: &endurecimiento
   restart: unless-stopped
-  environment: &env
-    PISHOP_APP_ENV: dev
-    PISHOP_CONSUL_URL: http://consul:8500
-    PISHOP_CONFIG_SERVICE_URL: http://config-service:8010
-    PISHOP_EVENT_BUS: redis
-    PISHOP_REDIS_URL: redis://redis:6379/0
-  depends_on:
-    consul: {condition: service_healthy}
-    redis: {condition: service_healthy}
+  read_only: true                       # el sistema de archivos del contenedor no se puede modificar
+  tmpfs: ["/tmp"]                       # único lugar donde se puede escribir (temporal, en RAM)
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]                     # sin capacidades especiales del kernel
+  networks: [interna]
+  deploy:
+    resources:
+      limits: {cpus: "0.50", memory: 256M}
+
+# Variables que comparten todos los servicios.
+x-entorno-comun: &entorno-comun
+  PISHOP_APP_ENV: ${PISHOP_APP_ENV:-dev}
+  PISHOP_CONSUL_URL: http://consul:8500
+  PISHOP_CONFIG_SERVICE_URL: http://config-service:8010
+  PISHOP_EVENT_BUS: redis
+  PISHOP_REDIS_URL: redis://redis:6379/0
+  PISHOP_REGISTRAR_EN_CONSUL: "true"
+  PISHOP_CONSULTAR_CONFIG_REMOTA: "true"
+
+# Dependencias de infraestructura de los servicios que usan base de datos.
+x-depende-de-datos: &depende-de-datos
+  postgres: {condition: service_healthy}
+  redis: {condition: service_healthy}
+  consul: {condition: service_started, required: false}
 
 services:
+  # ============================================================ INFRAESTRUCTURA
   consul:
     image: hashicorp/consul:1.21
     command: agent -server -bootstrap -ui -client=0.0.0.0
-    ports: ["8500:8500"]
+    ports: ["127.0.0.1:${PUERTO_CONSUL_HOST:-8500}:8500"]      # interfaz web de Consul: http://localhost:8500
+    networks: [interna, borde]
     healthcheck: {test: ["CMD", "consul", "members"], interval: 5s, retries: 10}
+    restart: unless-stopped
 
   redis:
     image: redis:8-alpine
-    ports: ["6379:6379"]
+    # Persistencia AOF: los eventos del stream sobreviven a un reinicio.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:${PUERTO_REDIS_HOST:-6380}:6379"]
+    volumes: ["datos_redis:/data"]
+    networks: [interna]
     healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10}
+    restart: unless-stopped
 
   postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD en .env}
-    volumes: ["./infra/initdb:/docker-entrypoint-initdb.d:ro"]   # crea pg_catalogo, pg_inventario, pg_pedidos, pg_pagos, pg_notif, pg_reportes
-    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 10}
+      # Las 6 contraseñas llegan al script infra/initdb/02-usuarios.sh
+      PG_CLAVE_CATALOGO: ${PG_CLAVE_CATALOGO:?defina PG_CLAVE_CATALOGO en .env}
+      PG_CLAVE_INVENTARIO: ${PG_CLAVE_INVENTARIO:?defina PG_CLAVE_INVENTARIO en .env}
+      PG_CLAVE_PEDIDOS: ${PG_CLAVE_PEDIDOS:?defina PG_CLAVE_PEDIDOS en .env}
+      PG_CLAVE_PAGOS: ${PG_CLAVE_PAGOS:?defina PG_CLAVE_PAGOS en .env}
+      PG_CLAVE_NOTIF: ${PG_CLAVE_NOTIF:?defina PG_CLAVE_NOTIF en .env}
+      PG_CLAVE_REPORTES: ${PG_CLAVE_REPORTES:?defina PG_CLAVE_REPORTES en .env}
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+      - ./infra/initdb:/docker-entrypoint-initdb.d:ro   # crea las 6 bases y sus usuarios
+    # Para verla con DataGrip/DBeaver: localhost:5433 (usuario usr_catalogo, etc.)
+    ports: ["127.0.0.1:${PUERTO_POSTGRES_HOST:-5433}:5432"]
+    networks: [interna]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 15}
+    restart: unless-stopped
 
+  # Visor web de las bases (solo desde este PC): http://localhost:8081
+  # Sistema: PostgreSQL · Servidor: postgres · Usuario: usr_catalogo (o el de la base) · Clave: la del .env
+  adminer:
+    image: adminer:latest
+    ports: ["127.0.0.1:${PUERTO_ADMINER_HOST:-8081}:8080"]
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    networks: [interna]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: unless-stopped
+
+  # ============================================================ SOPORTE
   config-service:
-    <<: *servicio
+    <<: *endurecimiento
     build: ./services/config-service
-    ports: ["8010:8010"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: config-service, PISHOP_HTTP_PORT: "8010"}
-
-  catalogo-service:
-    <<: *servicio
-    build: ./services/catalogo-service
-    ports: ["8001:8001"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: catalogo-service, PISHOP_HTTP_PORT: "8001"}
-
-  inventario-service:
-    <<: *servicio
-    build: ./services/inventario-service
-    ports: ["8002:8002"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: inventario-service, PISHOP_HTTP_PORT: "8002"}
-
-  pedidos-service:
-    <<: *servicio
-    build: ./services/pedidos-service
-    ports: ["8003:8003"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: pedidos-service, PISHOP_HTTP_PORT: "8003"}
-
-  pagos-service:
-    <<: *servicio
-    build: ./services/pagos-service
-    ports: ["8004:8004"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: pagos-service, PISHOP_HTTP_PORT: "8004", PISHOP_PASARELA_MODO: ok}
-
-  notificaciones-service:
-    <<: *servicio
-    build: ./services/notificaciones-service
-    ports: ["8005:8005"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: notificaciones-service, PISHOP_HTTP_PORT: "8005"}
-
-  reportes-service:
-    <<: *servicio
-    build: ./services/reportes-service
-    ports: ["8006:8006"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: reportes-service, PISHOP_HTTP_PORT: "8006"}
+    ports: ["127.0.0.1:8010:8010"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: config-service
+      PISHOP_HTTP_PORT: "8010"
+      # Opcional: si se define en .env, cambiar configuración exige la cabecera X-Token-Admin.
+      PISHOP_ADMIN_TOKEN: ${PISHOP_CONFIG_ADMIN_TOKEN:-}
+    depends_on:
+      consul: {condition: service_started, required: false}
 
   descubridor-service:
-    <<: *servicio
+    <<: *endurecimiento
     build: ./services/descubridor-service
-    ports: ["8090:8090"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: descubridor-service, PISHOP_HTTP_PORT: "8090"}
+    ports: ["127.0.0.1:8090:8090"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: descubridor-service
+      PISHOP_HTTP_PORT: "8090"
+    depends_on:
+      consul: {condition: service_started, required: false}
 
+  # ============================================================ CORE (uno por base)
+  catalogo-service:
+    <<: *endurecimiento
+    build: ./services/catalogo-service
+    ports: ["127.0.0.1:8001:8001"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: catalogo-service
+      PISHOP_HTTP_PORT: "8001"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://usr_catalogo@postgres:5432/pg_catalogo
+      PISHOP_DATABASE_PASSWORD: ${PG_CLAVE_CATALOGO}
+      PISHOP_SEMBRAR_DATOS: "true"          # carga los productos ficticios la primera vez
+    depends_on: *depende-de-datos
+
+  inventario-service:
+    <<: *endurecimiento
+    build: ./services/inventario-service
+    ports: ["127.0.0.1:8002:8002"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: inventario-service
+      PISHOP_HTTP_PORT: "8002"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://usr_inventario@postgres:5432/pg_inventario
+      PISHOP_DATABASE_PASSWORD: ${PG_CLAVE_INVENTARIO}
+      PISHOP_SEMBRAR_DATOS: "true"
+    depends_on: *depende-de-datos
+
+  pedidos-service:
+    <<: *endurecimiento
+    build: ./services/pedidos-service
+    ports: ["127.0.0.1:8003:8003"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: pedidos-service
+      PISHOP_HTTP_PORT: "8003"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://usr_pedidos@postgres:5432/pg_pedidos
+      PISHOP_DATABASE_PASSWORD: ${PG_CLAVE_PEDIDOS}
+    depends_on: *depende-de-datos
+
+  pagos-service:
+    <<: *endurecimiento
+    build: ./services/pagos-service
+    ports: ["127.0.0.1:8004:8004"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: pagos-service
+      PISHOP_HTTP_PORT: "8004"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://usr_pagos@postgres:5432/pg_pagos
+      PISHOP_DATABASE_PASSWORD: ${PG_CLAVE_PAGOS}
+      PISHOP_PASARELA_MODO: ok              # ok | rechaza | lenta | falla
+      PISHOP_PASARELA_URL: http://pagos-service:8004/_simulador/pasarela/cobrar
+    depends_on: *depende-de-datos
+
+  notificaciones-service:
+    <<: *endurecimiento
+    build: ./services/notificaciones-service
+    ports: ["127.0.0.1:8005:8005"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: notificaciones-service
+      PISHOP_HTTP_PORT: "8005"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://usr_notif@postgres:5432/pg_notif
+      PISHOP_DATABASE_PASSWORD: ${PG_CLAVE_NOTIF}
+    depends_on: *depende-de-datos
+
+  reportes-service:
+    <<: *endurecimiento
+    build: ./services/reportes-service
+    ports: ["127.0.0.1:8006:8006"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: reportes-service
+      PISHOP_HTTP_PORT: "8006"
+      PISHOP_DATABASE_URL: postgresql+asyncpg://usr_reportes@postgres:5432/pg_reportes
+      PISHOP_DATABASE_PASSWORD: ${PG_CLAVE_REPORTES}
+    depends_on: *depende-de-datos
+
+  # ============================================================ COMPUESTO (BFF)
   checkout-bff:
-    <<: *servicio
+    <<: *endurecimiento
     build: ./services/checkout-bff
-    ports: ["8080:8080"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: checkout-bff, PISHOP_HTTP_PORT: "8080"}
+    ports: ["127.0.0.1:8080:8080"]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: checkout-bff
+      PISHOP_HTTP_PORT: "8080"
+      # Descubrimiento por DNS de Docker: nombre lógico, nunca IP fija.
+      PISHOP_CATALOGO_URL: http://catalogo-service:8001
+      PISHOP_INVENTARIO_URL: http://inventario-service:8002
+      PISHOP_PEDIDOS_URL: http://pedidos-service:8003
+      PISHOP_PAGOS_URL: http://pagos-service:8004
+    depends_on:
+      catalogo-service: {condition: service_healthy}
+      inventario-service: {condition: service_healthy}
+      pedidos-service: {condition: service_healthy}
+      pagos-service: {condition: service_healthy}
 
+  # ============================================================ API PÚBLICA
   api-publica:
-    <<: *servicio
+    <<: *endurecimiento
     build: ./services/api-publica
-    ports: ["8000:8000"]
-    environment: {<<: *env, PISHOP_SERVICE_NAME: api-publica, PISHOP_HTTP_PORT: "8000", PISHOP_API_KEY: ${PISHOP_API_KEY:?defina PISHOP_API_KEY en .env}}
+    ports: ["8000:8000"]                  # la única puerta abierta hacia la red
+    networks: [interna, borde]
+    environment:
+      <<: *entorno-comun
+      PISHOP_SERVICE_NAME: api-publica
+      PISHOP_HTTP_PORT: "8000"
+      PISHOP_API_KEY: ${PISHOP_API_KEY:?defina PISHOP_API_KEY en .env}
+      PISHOP_RATE_LIMIT: ${PISHOP_RATE_LIMIT:-40/minute}
+      PISHOP_CATALOGO_URL: http://catalogo-service:8001
+      PISHOP_CHECKOUT_URL: http://checkout-bff:8080
+    depends_on:
+      checkout-bff: {condition: service_healthy}
+      catalogo-service: {condition: service_healthy}
+
+networks:
+  interna: {}
+  borde: {}
+
+volumes:
+  datos_postgres: {}
+  datos_redis: {}

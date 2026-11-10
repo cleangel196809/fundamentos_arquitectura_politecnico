@@ -1,0 +1,54 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pruebas-y-seguridad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+
+      - name: Dependencias (plantilla + todos los servicios + herramientas)
+        run: |
+          pip install -r plantilla-servicio/requirements.txt
+          for r in services/*/requirements.txt; do pip install -r "$r"; done
+          pip install pytest ruff bandit
+
+      - name: Linter (ruff)
+        run: ruff check services scripts herramientas --select E,F,W --line-length 180
+
+      - name: Pruebas de la plantilla
+        run: cd plantilla-servicio && python -m pytest -q
+
+      - name: Pruebas de cada servicio (SQLite + bus en memoria, sin Docker)
+        run: |
+          for d in services/*/; do
+            [ -d "$d/tests" ] || continue
+            echo "== $d"; (cd "$d" && python -m pytest -q) || exit 1
+          done
+
+      - name: Contratos (validar_entrega.py)
+        run: python herramientas/validar_entrega.py --todos
+
+      - name: Auditoría de ciberseguridad (fitness function)
+        run: |
+          python -m pytest -q herramientas/test_auditar_config.py
+          python herramientas/auditar_config.py
+
+      - name: Análisis estático de seguridad (bandit)
+        run: bandit -q -r services/*/app -ll
+
+  construir-imagenes:
+    runs-on: ubuntu-latest
+    needs: pruebas-y-seguridad
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose config + build
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose build

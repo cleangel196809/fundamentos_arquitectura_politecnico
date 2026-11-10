@@ -1,114 +1,66 @@
-import pytest
-import asyncio
+"""Los cuatro modos de la pasarela, la ACL, la idempotencia y el reembolso."""
+import time
+
 import httpx
-from fastapi.testclient import TestClient
-from app.main import app
-from app import acl, models, database, schemas
-from app.acl import PasarelaACL
 
-client = TestClient(app)
+COBRO = {"pedido_id": "PED-1", "monto_cop": 54000, "medio": "tarjeta"}
 
-def test_health_live():
-    response = client.get("/health/live")
-    assert response.status_code == 200
 
-def test_health_ready():
-    response = client.get("/health/ready")
-    assert response.status_code in [200, 503]
+def cobrar(cliente, clave="pago-clave-0001"):
+    return cliente.post("/v1/pagos", json=COBRO, headers={"Idempotency-Key": clave})
 
-def test_health_startup():
-    response = client.get("/health/startup")
-    assert response.status_code in [200, 503]
 
-def test_acl_cobertura_completa():
-    for token_val in ["Bearer token_prueba", "token_invalido", "", None]:
-        try:
-            acl.verificar_permisos(token_val)
-        except Exception:
-            pass
+def test_sondas(fabricar):
+    cliente = fabricar()
+    for ruta in ("/health/live", "/health/startup", "/health/ready"):
+        assert cliente.get(ruta).status_code == 200
 
-    for rol_val in ["admin", "supervisor", "cliente", None]:
-        try:
-            acl.verificar_rol(rol_val)
-        except Exception:
-            pass
 
-    try:
-        acl.obtener_usuario_actual(token="token_valido_mock")
-    except Exception:
-        pass
+def test_modo_ok_aprueba_y_traduce_vocabulario(fabricar):
+    cuerpo = cobrar(fabricar("ok")).json()
+    assert cuerpo["estado"] == "APROBADO" and cuerpo["codigo_autorizacion"].startswith("AUT-")
 
-def test_flujo_completo_pagos_con_db():
-    headers = {"Authorization": "Bearer token_valido"}
-    
-    # 1. Crear pago válido para insertar en base de datos real y activar líneas de main.py
-    payload_valido = {
-        "pedido_id": 100,
-        "monto": 120000.0,
-        "metodo_pago": "tarjeta"
-    }
-    res_crear = client.post("/v1/pagos", json=payload_valido, headers=headers)
-    assert res_crear.status_code in [200, 201, 401, 422]
 
-    pago_id = None
-    if res_crear.status_code in [200, 201]:
-        data = res_crear.json()
-        pago_id = data.get("id")
+def test_modo_rechaza(fabricar):
+    assert cobrar(fabricar("rechaza")).json()["estado"] == "RECHAZADO"
 
-    # 2. Si se creó, consultar el pago real por ID existente
-    if pago_id:
-        res_get = client.get(f"/v1/pagos/{pago_id}", headers=headers)
-        assert res_get.status_code in [200, 401, 404]
 
-        # 3. Solicitar reembolso sobre el pago real existente
-        res_reembolso = client.post(f"/v1/pagos/{pago_id}/reembolso", json={"motivo": "satisfaccion"})
-        assert res_reembolso.status_code in [200, 404, 422]
+def test_modo_falla_es_503(fabricar):
+    respuesta = cobrar(fabricar("falla"))
+    assert respuesta.status_code == 503 and respuesta.json()["codigo"] == "PASARELA_CAIDA"
 
-    # 4. Consultar ID inexistente para cubrir ramas de error/404
-    res_get_inexistente = client.get("/v1/pagos/999999", headers=headers)
-    assert res_get_inexistente.status_code in [200, 401, 404]
 
-    # 5. Simular cobro en pasarela con datos válidos
-    payload_cobro = {
-        "pago_id": pago_id if pago_id else 1,
-        "monto": 120000.0
-    }
-    res_cobrar = client.post("/v1/simulador/pasarela/cobrar", json=payload_cobro)
-    assert res_cobrar.status_code in [200, 404, 422]
+def test_modo_lento_responde_504_sin_colgarse(fabricar):
+    def pasarela_que_no_contesta(_peticion):
+        raise httpx.ReadTimeout("la pasarela no respondió")
 
-def test_pasarela_acl_cobertura_total():
-    class MockResponse:
-        def __init__(self, status_code, json_data):
-            self.status_code = status_code
-            self._json_data = json_data
-        def json(self):
-            return self._json_data
+    inicio = time.perf_counter()
+    respuesta = cobrar(fabricar("lenta", httpx.MockTransport(pasarela_que_no_contesta)))
+    assert respuesta.status_code == 504 and time.perf_counter() - inicio < 2
 
-    async def ejecutar_pruebas_acl():
-        from unittest.mock import patch
 
-        with patch("httpx.AsyncClient.post", return_value=MockResponse(504, {})):
-            res = await PasarelaACL.cobrar(100.0, "tarjeta")
-            assert res == "PENDIENTE"
+def test_misma_clave_no_cobra_dos_veces(fabricar):
+    cliente = fabricar()
+    primero, segundo = cobrar(cliente).json(), cobrar(cliente).json()
+    assert primero == segundo
 
-        with patch("httpx.AsyncClient.post", return_value=MockResponse(400, {})):
-            res = await PasarelaACL.cobrar(100.0, "tarjeta")
-            assert res == "RECHAZADO"
 
-        with patch("httpx.AsyncClient.post", return_value=MockResponse(200, {"status": "APPROVED"})):
-            res = await PasarelaACL.cobrar(100.0, "tarjeta")
-            assert res == "APROBADO"
+def test_sin_clave_400_y_validacion_422(fabricar):
+    cliente = fabricar()
+    assert cliente.post("/v1/pagos", json=COBRO).status_code == 400
+    assert cliente.post("/v1/pagos", json={**COBRO, "monto_cop": -5}, headers={"Idempotency-Key": "abc12345"}).status_code == 422
 
-        with patch("httpx.AsyncClient.post", return_value=MockResponse(200, {"status": "DECLINED"})):
-            res = await PasarelaACL.cobrar(100.0, "tarjeta")
-            assert res == "RECHAZADO"
 
-        with patch("httpx.AsyncClient.post", return_value=MockResponse(200, {"status": "OTHER"})):
-            res = await PasarelaACL.cobrar(100.0, "tarjeta")
-            assert res == "PENDIENTE"
+def test_reembolso_idempotente(fabricar):
+    cliente = fabricar()
+    pago_id = cobrar(cliente).json()["pago_id"]
+    assert cliente.post(f"/v1/pagos/{pago_id}/reembolso").json()["estado"] == "REEMBOLSADO"
+    assert cliente.post(f"/v1/pagos/{pago_id}/reembolso").json()["estado"] == "REEMBOLSADO"
+    assert cliente.get(f"/v1/pagos/{pago_id}").json()["estado"] == "REEMBOLSADO"
+    assert cliente.get("/v1/pagos/PAG-NADA").status_code == 404
 
-        with patch("httpx.AsyncClient.post", side_effect=httpx.TimeoutException("Timeout")):
-            res = await PasarelaACL.cobrar(50.0, "pse")
-            assert res == "PENDIENTE"
 
-    asyncio.run(ejecutar_pruebas_acl())
+def test_cambiar_modo_en_caliente(fabricar):
+    cliente = fabricar("ok")
+    assert cliente.put("/_simulador/pasarela/modo", json={"modo": "rechaza"}).status_code == 200
+    assert cobrar(cliente, "otra-clave-002").json()["estado"] == "RECHAZADO"
