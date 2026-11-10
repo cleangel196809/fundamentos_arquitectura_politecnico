@@ -1,88 +1,193 @@
-"""Servicio de Reportes (P10) - PiShop Cloud."""
-# Crea un identificador distinto para reconocer esta ejecucion del servicio. P10
-import uuid
-# Tipos usados para describir la funcion que prepara y cierra la aplicacion. P10
-from collections.abc import AsyncGenerator
-# Permite ejecutar tareas especiales al arrancar y apagar FastAPI. P10
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import sqlite3
+import uvicorn
 
-# Herramientas de FastAPI para crear la aplicacion y leer solicitudes/respuestas. P10
-from fastapi import FastAPI, Request, Response
+app = FastAPI(title="P10 - Microservicio de Reportes (SQLite CQRS)", version="1.1.0")
 
-# Base describe las tablas; engine permite conectarse a la base de datos. P10
-from app.database import Base, engine
-# Importa las direcciones web para crear y consultar reportes. P10
-from app.routers.reportes import router as reportes_router
-# Permite leer los valores de configuracion del servicio. P10
-from app.settings import get_settings
+DB_NAME = "reportes.db"
 
-# Carga la configuracion y prepara un identificador corto para esta instancia. P10
-settings = get_settings()
-INSTANCE_ID = f"{settings.service_name}-{uuid.uuid4().hex[:5]}"
+def inicializar_db():
+    """Crea las tablas en SQLite si no existen"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    # 1. Tabla de eventos procesados (Idempotencia)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS eventos_procesados (
+            evento_id TEXT PRIMARY KEY
+        )
+    """)
+    
+    # 2. Historial de eventos (Para /reconstruir)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historial_eventos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evento_id TEXT,
+            tipo_evento TEXT,
+            sku TEXT,
+            cantidad INTEGER,
+            monto_total REAL
+        )
+    """)
+    
+    # 3. Vista de lectura / Proyección por SKU
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS proyeccion_sku (
+            sku TEXT PRIMARY KEY,
+            unidades INTEGER,
+            monto_total REAL
+        )
+    """)
+    
+    conn.commit()
+    conn.close()
 
-
-# Esta funcion prepara la base de datos al iniciar y limpia la conexion al cerrar. P10
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Al comienzo, el servicio todavia no se considera listo. P10
-    app.state.started = False
-    # Guarda la version de configuracion actual (inicia en cero). P10
-    app.state.config_version = 0
-    try:
-        # Abre una conexion para preparar la estructura de la base de datos. P10
-        async with engine.begin() as conn:
-            # Crea las tablas necesarias si aun no existen. P10
-            await conn.run_sync(Base.metadata.create_all)
-        # A partir de aqui, el servicio ya termino de prepararse. P10
-        app.state.started = True
-        # Mantiene la aplicacion funcionando hasta que se solicite apagarla. P10
-        yield
-    finally:
-        # Al apagar, indica que el servicio ya no esta listo. P10
-        app.state.started = False
-        # Cierra de forma ordenada las conexiones a la base de datos. P10
-        await engine.dispose()
-
-
-# Crea la aplicacion web e indica su nombre, version y tareas de inicio/cierre. P10
-app = FastAPI(title=settings.service_name, version="1.0.0", lifespan=lifespan)
-
-# Agrega a la aplicacion las direcciones para manejar reportes. P10
-app.include_router(reportes_router)
+# Inicializar la base de datos al arrancar
+inicializar_db()
 
 
-# Esta direccion permite comprobar que el servicio responde. P10
-@app.get("/health", tags=["salud"])
-def health_check() -> dict[str, str]:
-    # Devuelve el estado, nombre e identificador de esta instancia. P10
-    return {"status": "ok", "service": settings.service_name, "instance": INSTANCE_ID}
+class EventoPedido(BaseModel):
+    evento_id: str
+    tipo_evento: str  # "PedidoCreado" o "PedidoCancelado"
+    sku: str
+    cantidad: int
+    monto_total: float
 
 
-# Esta direccion comprueba que el servicio sigue activo. P10
-@app.get("/health/live", tags=["salud"])
-def live() -> dict[str, str]:
-    # Responde con una señal sencilla de que el servicio esta vivo. P10
-    return {"status": "alive", "instance": INSTANCE_ID}
+def aplicar_cambio_sku(cursor, sku: str, cant: int, monto: float, es_creacion: bool):
+    """Actualiza o inserta las métricas del SKU en la base de datos"""
+    cursor.execute("SELECT unidades, monto_total FROM proyeccion_sku WHERE sku = ?", (sku,))
+    row = cursor.fetchone()
+
+    multiplicador = 1 if es_creacion else -1
+    cambio_unidades = cant * multiplicador
+    cambio_monto = monto * multiplicador
+
+    if row:
+        nuevas_unidades = max(0, row[0] + cambio_unidades)
+        nuevo_monto = max(0.0, row[1] + cambio_monto)
+        cursor.execute("""
+            UPDATE proyeccion_sku 
+            SET unidades = ?, monto_total = ? 
+            WHERE sku = ?
+        """, (nuevas_unidades, nuevo_monto, sku))
+    else:
+        if es_creacion:
+            cursor.execute("""
+                INSERT INTO proyeccion_sku (sku, unidades, monto_total) 
+                VALUES (?, ?, ?)
+            """, (sku, max(0, cambio_unidades), max(0.0, cambio_monto)))
 
 
-# Esta direccion informa si el servicio termino de arrancar. P10
-@app.get("/health/startup", tags=["salud"])
-def startup(request: Request, resp: Response) -> dict[str, bool]:
-    # Si aun no ha arrancado, comunica que el servicio no esta disponible. P10
-    if not request.app.state.started:
-        resp.status_code = 503
-    # Informa si la preparacion ya termino. P10
-    return {"started": request.app.state.started}
+@app.post("/v1/eventos/consumir", status_code=200)
+def consumir_evento(evento: EventoPedido):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # 1. Verificar idempotencia
+    cursor.execute("SELECT 1 FROM eventos_procesados WHERE evento_id = ?", (evento.evento_id,))
+    if cursor.fetchone():
+        conn.close()
+        return {
+            "status": "ignorado",
+            "mensaje": f"Evento '{evento.evento_id}' ya fue procesado anteriormente (Idempotencia verificada)."
+        }
+
+    # 2. Registrar evento procesado e historial
+    cursor.execute("INSERT INTO eventos_procesados (evento_id) VALUES (?)", (evento.evento_id,))
+    cursor.execute("""
+        INSERT INTO historial_eventos (evento_id, tipo_evento, sku, cantidad, monto_total)
+        VALUES (?, ?, ?, ?, ?)
+    """, (evento.evento_id, evento.tipo_evento, evento.sku, evento.cantidad, evento.monto_total))
+
+    # 3. Aplicar a la proyección
+    es_creacion = (evento.tipo_evento == "PedidoCreado")
+    aplicar_cambio_sku(cursor, evento.sku, evento.cantidad, evento.monto_total, es_creacion)
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "procesado", "evento_id": evento.evento_id}
 
 
-# Esta direccion informa si el servicio esta listo para recibir trabajo. P10
-@app.get("/health/ready", tags=["salud"])
-def ready(request: Request, resp: Response) -> dict[str, object]:
-    # Lee la version de configuracion y el estado de inicio. P10
-    config_version = request.app.state.config_version
-    ok = request.app.state.started
-    # Usa el codigo 503 mientras el servicio no este listo. P10
-    if not ok:
-        resp.status_code = 503
-    # Devuelve el estado de preparacion y la identidad de esta instancia. P10
-    return {"ready": ok, "config_version": config_version, "instance": INSTANCE_ID}
+@app.get("/v1/reportes/resumen")
+def obtener_resumen():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT SUM(unidades), SUM(monto_total) FROM proyeccion_sku")
+    row_sku = cursor.fetchone()
+    
+    cursor.execute("SELECT COUNT(DISTINCT evento_id) FROM historial_eventos WHERE tipo_evento = 'PedidoCreado'")
+    row_pedidos = cursor.fetchone()
+
+    conn.close()
+
+    return {
+        "pedidos_total": row_pedidos[0] if row_pedidos and row_pedidos[0] else 0,
+        "unidades_total": row_sku[0] if row_sku and row_sku[0] else 0,
+        "monto_total_cop": row_sku[1] if row_sku and row_sku[1] else 0.0
+    }
+
+
+@app.get("/v1/reportes/ventas-por-sku")
+def obtener_ventas_por_sku():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT sku, unidades, monto_total FROM proyeccion_sku")
+    rows = cursor.fetchall()
+    conn.close()
+
+    resultado = {}
+    for r in rows:
+        resultado[r[0]] = {
+            "unidades": r[1],
+            "monto_total": r[2]
+        }
+    return resultado
+
+
+@app.post("/v1/reportes/reconstruir")
+def reconstruir_proyeccion():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # 1. Limpiar proyecciones y eventos procesados (conservando historial)
+    cursor.execute("DELETE FROM proyeccion_sku")
+    cursor.execute("DELETE FROM eventos_procesados")
+
+    # 2. Leer todo el historial
+    cursor.execute("SELECT evento_id, tipo_evento, sku, cantidad, monto_total FROM historial_eventos")
+    eventos = cursor.fetchall()
+
+    # 3. Reprocesar
+    for ev in eventos:
+        ev_id, tipo, sku, cant, monto = ev
+        cursor.execute("INSERT INTO eventos_procesados (evento_id) VALUES (?)", (ev_id,))
+        es_creacion = (tipo == "PedidoCreado")
+        aplicar_cambio_sku(cursor, sku, cant, monto, es_creacion)
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "status": "ok",
+        "mensaje": "Proyección reconstruida desde SQLite utilizando el historial.",
+        "eventos_reprocesados": len(eventos)
+    }
+
+
+@app.get("/")
+def raiz():
+    return {"mensaje": "Microservicio P10 - Reportes (SQLite CQRS) activo", "documentacion": "/docs"}
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "servicio": "reportes-service"}
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8006)
