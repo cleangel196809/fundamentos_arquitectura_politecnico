@@ -81,6 +81,34 @@ async def cargar_semilla(repo: Repositorio, seed_path: str) -> int:
     return sembradas
 
 
+def anunciar_direcciones(s) -> None:
+    """Al terminar el arranque imprime en la consola las direcciones para abrir con Ctrl + clic."""
+    base = f"http://{s.public_host}:{s.http_port}"
+    token = s.api_token.get_secret_value()
+    if not token:
+        acceso = "API pública (sin PISHOP_API_TOKEN): no pide clave"
+    elif s.app_env == "dev":
+        acceso = f"Token de prueba (dev): {token}  -> Swagger ya abre autorizado"
+    else:
+        acceso = "Requiere 'Authorization: Bearer <PISHOP_API_TOKEN>'"
+    lineas = [
+        "",
+        "=" * 70,
+        f"  {s.service_name} (P08) LISTO  ·  entorno: {s.app_env}",
+        "  Abra en el navegador (Ctrl + clic sobre la dirección):",
+        f"    Swagger (probar la API) : {base}/docs",
+        f"    Sonda live              : {base}/health/live",
+        f"    Sonda ready             : {base}/health/ready",
+        f"    Sonda startup           : {base}/health/startup",
+        f"    Contrato OpenAPI        : {base}/openapi.json",
+        f"    Ejemplo de lectura      : {base}/config/catalogo-service/prod",
+        f"  {acceso}",
+        "=" * 70,
+        "",
+    ]
+    print("\n".join(lineas), flush=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
@@ -94,6 +122,7 @@ async def lifespan(app: FastAPI):
     ESTADO["repo"] = repo
     ESTADO["config_version"] = 1 if (sembradas > 0 or total > 0) else 0
     ESTADO["arranco"] = True
+    anunciar_direcciones(s)
     yield
     ESTADO["arranco"] = False
     ESTADO["cambio"] = None
