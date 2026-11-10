@@ -10,3 +10,5 @@ __pycache__/
 .coverage
 *.db
 .venv/
+
+subir_a_github.bat
