@@ -19,6 +19,51 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR / "herramientas"))
+
+try:
+    from validar_fronteras import verificar_fronteras_arquitectonicas
+except ImportError:
+    verificar_fronteras_arquitectonicas = None
+
+
+def test_arquitectura_oficial():
+    """Valida que la arquitectura oficial cumpla con Database-per-Service (exit code 0)."""
+    compose_valido = BASE_DIR / "docker-compose.yml"
+    if verificar_fronteras_arquitectonicas is not None:
+        assert verificar_fronteras_arquitectonicas(compose_valido) == 0
+    else:
+        python_exe = sys.executable
+        script_path = BASE_DIR / "herramientas" / "validar_fronteras.py"
+        res = subprocess.run(
+            [python_exe, str(script_path), "--compose", str(compose_valido)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace"
+        )
+        assert res.returncode == 0, f"Esperado 0, recibido {res.returncode}:\n{res.stdout}"
+
+
+def test_antipatron_bd_compartida():
+    """Valida que un docker-compose con BD compartida falle como compuerta de calidad (exit code 1)."""
+    compose_invalido = BASE_DIR / "herramientas" / "test_fixtures" / "docker-compose.invalido.yml"
+    if verificar_fronteras_arquitectonicas is not None:
+        assert verificar_fronteras_arquitectonicas(compose_invalido) == 1
+    else:
+        python_exe = sys.executable
+        script_path = BASE_DIR / "herramientas" / "validar_fronteras.py"
+        res = subprocess.run(
+            [python_exe, str(script_path), "--compose", str(compose_invalido)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace"
+        )
+        assert res.returncode == 1, f"Esperado exit code 1, recibido {res.returncode}:\n{res.stdout}"
+        assert "DATABASE-PER-SERVICE" in res.stdout or "[VIOLACION]" in res.stdout
+
 
 def run_test():
     python_exe = sys.executable
