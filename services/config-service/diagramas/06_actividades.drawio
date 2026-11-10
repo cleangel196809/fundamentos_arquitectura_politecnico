@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-11-08T00:00:00.000Z" agent="draw.io" version="24.7.17" type="device">
+  <diagram id="06-actividades-uml" name="06 Actividades UML">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama UML de Actividades — Resolución de Configuración, Auditoría PUT y Polling Resiliente
+Autor: Francisco Navarro · P08 config-service (:8010)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="lane1" value="Carril 1: Cliente (ConfigClient / Operador)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="40" y="85" width="380" height="730" as="geometry"/></mxCell>
+        <mxCell id="lane2" value="Carril 2: API FastAPI (config-service :8010)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="420" y="85" width="440" height="730" as="geometry"/></mxCell>
+        <mxCell id="lane3" value="Carril 3: Almacén SQLite (config_versiones)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="860" y="85" width="360" height="730" as="geometry"/></mxCell>
+        <mxCell id="ac_ini" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#0f172a;strokeColor=#0f172a;" vertex="1" parent="1"><mxGeometry x="215" y="130" width="30" height="30" as="geometry"/></mxCell>
+        <mxCell id="ac_req" value="Enviar petición HTTP
+(GET con If-None-Match o
+PUT con cabecera X-Autor)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="190" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_tipo" value="¿Método
+HTTP?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="580" y="180" width="120" height="75" as="geometry"/></mxCell>
+        <mxCell id="ac_get_db" value="Consultar versión en SQLite
+(actual o ?version=N)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="930" y="190" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_existe" value="¿Existe
+versión?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="580" y="290" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="ac_404" value="Responder 404
+CONFIG_NO_ENCONTRADA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="445" y="390" width="165" height="55" as="geometry"/></mxCell>
+        <mxCell id="ac_etag" value="¿If-None-Match
+== ETag "vN"?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="665" y="385" width="145" height="75" as="geometry"/></mxCell>
+        <mxCell id="ac_304" value="Responder 304 Not Modified
+(sin cuerpo, conserva caché)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="395" width="220" height="55" as="geometry"/></mxCell>
+        <mxCell id="ac_200" value="Responder 200 OK + ETag "vN"
+Recarga en caliente (Hot Reload)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="490" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_autor" value="¿X-Autor válido
+y Write-Token OK?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="570" y="510" width="145" height="80" as="geometry"/></mxCell>
+        <mxCell id="ac_422" value="Responder 422 AUTOR_VACIO
+o 401 NO_AUTORIZADO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="445" y="635" width="175" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_ins" value="Transacción atómica SQLite:
+SELECT MAX(version)+1
+INSERT fila inmutable + UTC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="925" y="515" width="230" height="75" as="geometry"/></mxCell>
+        <mxCell id="ac_201" value="Responder 201 Created
+con nuevo ETag "vN+1"" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="660" y="635" width="180" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_fallo" value="Si hay HTTPError / Timeout:
+Conservar última versión o
+defaults en caché local" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="610" width="220" height="70" as="geometry"/></mxCell>
+        <mxCell id="ac_fin" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#0f172a;strokeColor=#0f172a;strokeWidth=4;" vertex="1" parent="1"><mxGeometry x="215" y="745" width="30" height="30" as="geometry"/></mxCell>
+        <mxCell id="af1" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_ini" target="ac_req"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af2" value="HTTP" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_req" target="ac_tipo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af3" value="[GET]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_tipo" target="ac_get_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af4" value="fila / None" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_get_db" target="ac_existe"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af5" value="[No]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_existe" target="ac_404"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af6" value="[Sí]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_existe" target="ac_etag"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af7" value="[Coincide]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_etag" target="ac_304"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af8" value="[Cambió]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_etag" target="ac_200"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af9" value="[PUT / Rollback]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_tipo" target="ac_autor"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af10" value="[No]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_autor" target="ac_422"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af11" value="[Sí]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_autor" target="ac_ins"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af12" value="vN+1" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_ins" target="ac_201"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af13" value="excepción de red" style="endArrow=block;endFill=1;dashed=1;html=1;strokeColor=#b45309;" edge="1" parent="1" source="ac_req" target="ac_fallo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af14" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_304" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af15" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_200" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af16" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_201" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af17" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_404" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af18" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_422" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af19" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_fallo" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

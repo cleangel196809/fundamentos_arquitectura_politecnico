@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-11-08T00:00:00.000Z" agent="draw.io" version="24.7.17" type="device">
+  <diagram id="01-casos-de-uso-general" name="01 Casos de Uso General">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama UML de Casos de Uso General — P08 config-service (PiShop Cloud)
+Autor: Francisco Navarro · Curso: Fundamentos de Arquitectura (1419) · Fecha: 2026-11-08" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="sys" value="Sistema: P08 · config-service (:8010) — Fuente Única de Configuración" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="270" y="85" width="730" height="680" as="geometry"/></mxCell>
+        <mxCell id="act_srv" value="Microservicio Cliente
+(P01..P10 / config_client.py)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="170" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="act_ops" value="Arquitecto / Operador
+DevOps (X-Autor)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="410" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="act_mon" value="Consul / Docker
+Healthcheck" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="620" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="act_seed" value="Repositorio GitOps
+(seed.json)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1090" y="210" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="act_db" value="Base de Datos Propia
+SQLite (config_versiones)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1090" y="470" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="uc1" value="CU-01: Consultar configuración
+vigente con ETag / If-None-Match
+(GET /config/{app}/{env})" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="70" y="55" width="270" height="75" as="geometry"/></mxCell>
+        <mxCell id="uc2" value="CU-02: Consultar versión
+histórica específica
+(GET /config/{app}/{env}?version=N)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="70" y="155" width="270" height="75" as="geometry"/></mxCell>
+        <mxCell id="uc3" value="CU-03: Publicar nueva versión
+de configuración auditada
+(PUT /config/{app}/{env})" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="70" y="260" width="270" height="75" as="geometry"/></mxCell>
+        <mxCell id="uc4" value="CU-04: Auditar historial
+de versiones
+(GET /config/{app}/{env}/versions)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="70" y="365" width="270" height="75" as="geometry"/></mxCell>
+        <mxCell id="uc5" value="CU-05: Revertir a versión
+anterior (Rollback inmutable)
+(POST /config/{app}/{env}/rollback/{v})" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="70" y="465" width="270" height="80" as="geometry"/></mxCell>
+        <mxCell id="uc6" value="CU-06: Sembrar configuración
+inicial (7 servicios × 4 entornos)
+(cargar_semilla seed.json)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="415" y="75" width="275" height="75" as="geometry"/></mxCell>
+        <mxCell id="uc7" value="CU-07: Validar autoría X-Autor
+y SecretStr X-Write-Token" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="420" y="265" width="265" height="70" as="geometry"/></mxCell>
+        <mxCell id="uc8" value="CU-08: Persistir fila inmutable
+N+1 en SQLite" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="420" y="395" width="265" height="70" as="geometry"/></mxCell>
+        <mxCell id="uc9" value="CU-09: Evaluar sondas de salud
+(/health/live, /ready, /startup)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys"><mxGeometry x="70" y="575" width="270" height="75" as="geometry"/></mxCell>
+        <mxCell id="e1" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="act_srv" target="uc1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="act_srv" target="uc2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="act_ops" target="uc2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="act_ops" target="uc3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="act_ops" target="uc4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="act_ops" target="uc5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="act_mon" target="uc9"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="uc6" target="act_seed"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="uc8" target="act_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="uc1" target="act_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i1" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uc3" target="uc7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i2" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uc5" target="uc7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i3" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uc3" target="uc8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i4" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uc5" target="uc8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i5" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uc6" target="uc8"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="02-caso-de-uso-especifico" name="02 Caso de Uso Especifico">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama UML de Caso de Uso Específico — CU-03: Publicar y Recargar Configuración en Caliente con Rollback
+Autor: Francisco Navarro · P08 config-service · Trazabilidad ISO 9001 §7.5 e ISO/IEC 25010" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="sys2" value="Frontera del Caso de Uso Específico CU-03 (config-service + config_client.py)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="250" y="85" width="680" height="470" as="geometry"/></mxCell>
+        <mxCell id="a_arq" value="Arquitecto / DevOps
+(Actor Primario)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="175" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="a_cli" value="Microservicio Cliente
+(catalogo-service)
+(Actor Secundario)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="385" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="a_sqlite" value="SQLite Propia
+(config_versiones)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1040" y="260" width="45" height="90" as="geometry"/></mxCell>
+        <mxCell id="uce_main" value="CU-03: Publicar versión de
+configuración y propagar
+en caliente (&lt;= 15 s)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="50" y="60" width="250" height="80" as="geometry"/></mxCell>
+        <mxCell id="uce_val" value="Validar cabecera X-Autor,
+motivo (3..256 chars) y
+esquema Pydantic" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="50" width="265" height="70" as="geometry"/></mxCell>
+        <mxCell id="uce_ins" value="Calcular MAX(version)+1
+e insertar fila inmutable
+con timestamp UTC" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="145" width="265" height="75" as="geometry"/></mxCell>
+        <mxCell id="uce_etag" value="Emitir cabecera ETag: "vN"
+y responder 201 Created" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="245" width="265" height="65" as="geometry"/></mxCell>
+        <mxCell id="uce_poll" value="Polling cada 15 s con
+If-None-Match (304 / 200
+recarga en caliente)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="50" y="260" width="250" height="80" as="geometry"/></mxCell>
+        <mxCell id="uce_err" value="Rechazar con 422 AUTOR_VACIO
+o 401 NO_AUTORIZADO" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="50" y="165" width="250" height="65" as="geometry"/></mxCell>
+        <mxCell id="uce_fb" value="Degradar a caché local o
+defaults ante caída HTTP
+(tolerancia a fallos)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="sys2"><mxGeometry x="375" y="345" width="265" height="75" as="geometry"/></mxCell>
+        <mxCell id="es1" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="a_arq" target="uce_main"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es2" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="a_cli" target="uce_poll"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es3" value="" style="endArrow=none;html=1;strokeWidth=1.5;strokeColor=#334155;" edge="1" parent="1" source="uce_ins" target="a_sqlite"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es4" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_main" target="uce_val"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es5" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_main" target="uce_ins"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es6" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_main" target="uce_etag"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es7" value="&lt;&lt;extend&gt;&gt;
+[sin X-Autor o token inválido]" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_err" target="uce_main"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es8" value="&lt;&lt;extend&gt;&gt;
+[ETag distinto != 304]" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_poll" target="uce_etag"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="es9" value="&lt;&lt;extend&gt;&gt;
+[timeout / error 5xx]" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#475569;fontSize=11;" edge="1" parent="1" source="uce_fb" target="uce_poll"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ficha" value="FICHA DE ESPECIFICACIÓN DEL CASO DE USO CU-03
+• ID y Nombre: CU-03 — Publicar versión de configuración auditada y recargar en caliente.
+• Actor primario: Arquitecto / Operador DevOps · Actor secundario: Microservicio cliente (config_client.py).
+• Precondiciones: config-service activo en :8010 con esquema SQLite creado y semilla seed.json cargada.
+• Flujo principal: (1) El operador envía PUT /config/{app}/{env} con cabecera X-Autor y JSON {data, motivo}. (2) El servicio valida X-Autor y el cuerpo Pydantic. (3) En transacción atómica obtiene COALESCE(MAX(version),0)+1 e inserta fila en config_versiones. (4) Retorna 201 Created con ETag: "vN". (5) En el siguiente ciclo (&lt;=15 s), config_client.py envía If-None-Match, recibe 200 OK con el nuevo ETag y actualiza ESTADO en memoria sin reiniciar.
+• Flujos alternos: (3a) Falta X-Autor o viene vacío -&gt; 422 VALIDACION / AUTOR_VACIO. (3b) Token inválido -&gt; 401 NO_AUTORIZADO. (5a) Si la versión no cambió -&gt; 304 Not Modified. (5b) Si config-service cae -&gt; ConfigClient conserva la última versión válida o defaults.
+• Postcondiciones: Nueva versión vN persistida de forma inmutable (cumple ISO 9001 §7.5 e ISO/IEC 25010 Fiabilidad y Trazabilidad)." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="40" y="575" width="1180" height="240" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="03-orientado-a-eventos" name="03 Orientado a Eventos">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama de Arquitectura Orientada a Eventos (EDA) — Cambio, Propagación y Reacción de Configuración
+Autor: Francisco Navarro · P08 config-service + Integración con pishop.pedidos (Redis Streams)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="z1" value="1. Productores de Eventos" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="40" y="85" width="250" height="690" as="geometry"/></mxCell>
+        <mxCell id="z2" value="2. Eventos de Dominio / Operación" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="320" y="85" width="300" height="690" as="geometry"/></mxCell>
+        <mxCell id="z3" value="3. Registro / Canal de Estado y Eventos" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="650" y="85" width="270" height="690" as="geometry"/></mxCell>
+        <mxCell id="z4" value="4. Consumidores y Reacciones Reactivas" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="950" y="85" width="280" height="690" as="geometry"/></mxCell>
+        <mxCell id="p_boot" value="Lifespan de Arranque
+(cargar_semilla seed.json)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="65" y="135" width="200" height="70" as="geometry"/></mxCell>
+        <mxCell id="p_ops" value="Operador / Arquitecto
+(PUT /config/{app}/{env}
+con X-Autor)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="65" y="285" width="200" height="80" as="geometry"/></mxCell>
+        <mxCell id="p_rb" value="Acción Correctiva
+(POST /config/.../rollback/{v})" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="65" y="445" width="200" height="75" as="geometry"/></mxCell>
+        <mxCell id="p_ped" value="pedidos-service (P03)
+Publicador Outbox
+(usa stream_nombre de P08)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="65" y="605" width="200" height="85" as="geometry"/></mxCell>
+        <mxCell id="ev1" value="Evento:
+ConfigSembrada (v1)
+{app, env, autor:'seed'}" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;" vertex="1" parent="1"><mxGeometry x="350" y="130" width="240" height="80" as="geometry"/></mxCell>
+        <mxCell id="ev2" value="Evento:
+ConfigVersionPublicada (vN)
+{app, env, version, ETag, autor}" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;" vertex="1" parent="1"><mxGeometry x="350" y="285" width="240" height="85" as="geometry"/></mxCell>
+        <mxCell id="ev3" value="Evento:
+ConfigRevertida (vN+1)
+{motivo:'rollback a vX'}" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;" vertex="1" parent="1"><mxGeometry x="350" y="440" width="240" height="80" as="geometry"/></mxCell>
+        <mxCell id="ev4" value="Evento de Dominio:
+PedidoCreado / PedidoCancelado
+{evento_id, pedido_id, sku}" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;" vertex="1" parent="1"><mxGeometry x="350" y="605" width="240" height="85" as="geometry"/></mxCell>
+        <mxCell id="ch_db" value="Event Log Inmutable
+SQLite config_versiones
+(Append-Only + ETag "vN")" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="680" y="210" width="210" height="120" as="geometry"/></mxCell>
+        <mxCell id="ch_poll" value="Canal HTTP Condicional
+GET /config/{app}/{env}
+If-None-Match -&gt; 200 / 304" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="680" y="390" width="210" height="100" as="geometry"/></mxCell>
+        <mxCell id="ch_redis" value="Bus de Eventos Redis Streams
+Stream: pishop.pedidos
+(configurado desde P08)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="680" y="595" width="210" height="110" as="geometry"/></mxCell>
+        <mxCell id="c_cli" value="ConfigClient (P01..P10)
+Detector de Cambio de ETag
+Dispara callback on_update(v, data)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="975" y="165" width="230" height="95" as="geometry"/></mxCell>
+        <mxCell id="c_hot" value="Recarga en Caliente (Hot Reload)
+Actualiza ESTADO['version']
+y parámetros sin reiniciar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="975" y="315" width="230" height="90" as="geometry"/></mxCell>
+        <mxCell id="c_rdy" value="Sonda /health/ready
+Pasa de 503 a 200 OK
+exponiendo config_version=vN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="975" y="450" width="230" height="85" as="geometry"/></mxCell>
+        <mxCell id="c_grp" value="Grupos Consumidores Redis
+• notificaciones (P05)
+• reportes CQRS (P10)
+Deduplican por evento_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="975" y="595" width="230" height="110" as="geometry"/></mxCell>
+        <mxCell id="ev_f1" value="emite" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="p_boot" target="ev1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f2" value="emite" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="p_ops" target="ev2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f3" value="emite" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="p_rb" target="ev3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f4" value="publica" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="p_ped" target="ev4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f5" value="append v1" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="ev1" target="ch_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f6" value="append vN" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="ev2" target="ch_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f7" value="append vN+1" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="ev3" target="ch_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f8" value="expone ETag" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="ch_db" target="ch_poll"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f9" value="notifica cambio (200 OK)" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="ch_poll" target="c_cli"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f10" value="on_update()" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="c_cli" target="c_hot"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f11" value="habilita tráfico" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="c_hot" target="c_rdy"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f12" value="XADD" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="ev4" target="ch_redis"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev_f13" value="XREADGROUP" style="endArrow=block;endFill=1;html=1;strokeWidth=1.8;strokeColor=#b45309;fontSize=11;" edge="1" parent="1" source="ch_redis" target="c_grp"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="04-secuencia-uml" name="04 Secuencia UML">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama UML de Secuencia — Ciclo Completo de Configuración, ETag (304), Hot Reload y Rollback
+Autor: Francisco Navarro · P08 config-service (:8010)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="p1" value=":Operador DevOps
+(X-Autor: fnavarro)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="55" y="85" width="150" height="50" as="geometry"/></mxCell>
+        <mxCell id="p2" value=":ConfigClient
+(catalogo-service)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="335" y="85" width="150" height="50" as="geometry"/></mxCell>
+        <mxCell id="p3" value=":config-service
+(FastAPI app/main.py)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="655" y="85" width="155" height="50" as="geometry"/></mxCell>
+        <mxCell id="p4" value=":Repositorio SQLite
+(app/store.py)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="975" y="85" width="155" height="50" as="geometry"/></mxCell>
+        <mxCell id="ll1" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=1.5;strokeColor=#64748b;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="130" y="135" as="sourcePoint"/><mxPoint x="130" y="810" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="ll2" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=1.5;strokeColor=#64748b;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="410" y="135" as="sourcePoint"/><mxPoint x="410" y="810" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="ll3" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=1.5;strokeColor=#64748b;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="135" as="sourcePoint"/><mxPoint x="730" y="810" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="ll4" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=1.5;strokeColor=#64748b;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1050" y="135" as="sourcePoint"/><mxPoint x="1050" y="810" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m1" value="1: lifespan() -&gt; crear_esquema() + cargar_semilla(seed.json)" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="165" as="sourcePoint"/><mxPoint x="1050" y="165" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m2" value="2: v1 sembrada (28 combinaciones: 7 servicios × 4 entornos)" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1050" y="195" as="sourcePoint"/><mxPoint x="730" y="195" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m3" value="3: GET /config/catalogo-service/prod" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="410" y="235" as="sourcePoint"/><mxPoint x="730" y="235" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m4" value="4: actual('catalogo-service', 'prod')" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="265" as="sourcePoint"/><mxPoint x="1050" y="265" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m5" value="5: VersionConfig(v=1, pagina_tamano=50)" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1050" y="295" as="sourcePoint"/><mxPoint x="730" y="295" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m6" value="6: 200 OK [ETag: "v1"] {version: 1, data: {...}}" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="325" as="sourcePoint"/><mxPoint x="410" y="325" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="fr_loop" value="loop [Cada 15 s — Sin cambios]" style="shape=umlFrame;whiteSpace=wrap;html=1;width=140;height=24;fillColor=#f8fafc;strokeColor=#475569;fontStyle=1;fontSize=11;" vertex="1" parent="1"><mxGeometry x="310" y="355" width="520" height="95" as="geometry"/></mxCell>
+        <mxCell id="m7" value="7: GET /config/catalogo-service/prod [If-None-Match: "v1"]" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="410" y="390" as="sourcePoint"/><mxPoint x="730" y="390" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m8" value="8: 304 Not Modified [ETag: "v1"] (cuerpo vacío)" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="425" as="sourcePoint"/><mxPoint x="410" y="425" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m9" value="9: PUT /config/catalogo-service/prod [X-Autor: fnavarro] {pagina_tamano: 80}" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="130" y="475" as="sourcePoint"/><mxPoint x="730" y="475" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m10" value="10: publicar(app, env, data, autor='fnavarro', motivo) -&gt; INSERT v2" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="505" as="sourcePoint"/><mxPoint x="1050" y="505" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m11" value="11: VersionConfig(v=2, creado_en=UTC)" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1050" y="535" as="sourcePoint"/><mxPoint x="730" y="535" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m12" value="12: 201 Created [ETag: "v2"] {version: 2, autor: "fnavarro"}" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="565" as="sourcePoint"/><mxPoint x="130" y="565" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m13" value="13: GET /config/catalogo-service/prod [If-None-Match: "v1"]" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="410" y="610" as="sourcePoint"/><mxPoint x="730" y="610" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m14" value="14: 200 OK [ETag: "v2"] -&gt; on_update(2, {pagina_tamano: 80}) Hot Reload" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="640" as="sourcePoint"/><mxPoint x="410" y="640" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m15" value="15: POST /config/catalogo-service/prod/rollback/1 [X-Autor: fnavarro]" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="130" y="690" as="sourcePoint"/><mxPoint x="730" y="690" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m16" value="16: obtener(v=1) + publicar(v=3, motivo='rollback a v1')" style="endArrow=block;endFill=1;html=1;strokeWidth=1.6;strokeColor=#0f172a;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="725" as="sourcePoint"/><mxPoint x="1050" y="725" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m17" value="17: VersionConfig(v=3, data=v1.data)" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1050" y="755" as="sourcePoint"/><mxPoint x="730" y="755" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m18" value="18: 201 Created [ETag: "v3"] {version: 3, motivo: "rollback a v1"}" style="endArrow=open;endSize=10;dashed=1;html=1;strokeWidth=1.4;strokeColor=#334155;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="785" as="sourcePoint"/><mxPoint x="130" y="785" as="targetPoint"/></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="05-clases-y-mer" name="05 Clases y MER">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama UML de Clases y Modelo Entidad-Relación (MER) — P08 config-service
+Autor: Francisco Navarro · Separación de Esquema HTTP (Pydantic), Dominio/Almacén (SQLite) y Cliente" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="c_set" value="&lt;&lt;BaseSettings&gt;&gt;
+Settings (app/settings.py)
+────────────────────────────────────
++ service_name: str = 'config-service'
++ http_port: int = 8010
++ app_env: str = 'dev'
++ database_url: str
++ seed_path: str = ''
++ write_token: SecretStr
++ http_timeout_seconds: float = 2.0
+────────────────────────────────────
++ get_settings() -&gt; Settings {frozen=True}" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;fontFamily=Courier New;fontSize=11;fontStyle=0;" vertex="1" parent="1"><mxGeometry x="45" y="100" width="340" height="215" as="geometry"/></mxCell>
+        <mxCell id="c_pub" value="&lt;&lt;Pydantic Schema (ACL HTTP)&gt;&gt;
+Publicacion (app/main.py)
+────────────────────────────────────
++ data: dict[str, Valor]
++ motivo: str = 'actualización...' (3..256)
+────────────────────────────────────
++ _validar_escritura(x_autor, token) -&gt; str
++ _etag_para(version: int) -&gt; str" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=10;fontFamily=Courier New;fontSize=11;" vertex="1" parent="1"><mxGeometry x="45" y="355" width="340" height="165" as="geometry"/></mxCell>
+        <mxCell id="c_repo" value="&lt;&lt;Repository&gt;&gt;
+Repositorio (app/store.py)
+────────────────────────────────────
+- ruta: str
+- _conn: sqlite3.Connection
+- _lock: threading.RLock
+────────────────────────────────────
++ crear_esquema() -&gt; None
++ ping() -&gt; bool
++ actual(app, env) -&gt; VersionConfig | None
++ obtener(app, env, v) -&gt; VersionConfig | None
++ historial(app, env) -&gt; list[VersionConfig]
++ publicar(app, env, data, autor, motivo) -&gt; VersionConfig
++ cuenta() -&gt; int
++ cerrar() -&gt; None" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;fontFamily=Courier New;fontSize=11;" vertex="1" parent="1"><mxGeometry x="445" y="100" width="380" height="245" as="geometry"/></mxCell>
+        <mxCell id="c_ent" value="&lt;&lt;Dataclass Frozen&gt;&gt;
+VersionConfig (app/store.py)
+────────────────────────────────────
++ id: int
++ app: str
++ env: str
++ version: int
++ data_json: str
++ autor: str
++ motivo: str
++ creado_en: str (ISO-8601 UTC)
+────────────────────────────────────
++ a_dict(con_data: bool = True) -&gt; dict" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;fontFamily=Courier New;fontSize=11;" vertex="1" parent="1"><mxGeometry x="445" y="385" width="380" height="235" as="geometry"/></mxCell>
+        <mxCell id="c_cli" value="&lt;&lt;Reusable Client&gt;&gt;
+ConfigClient (app/config_client.py)
+────────────────────────────────────
++ base_url: str
++ service_name: str
++ app_env: str
++ defaults: dict[str, Any]
++ poll_seconds: float = 15.0
++ timeout_seconds: float = 2.0
++ version: int = 0
++ etag: str | None
++ data: dict[str, Any]
+────────────────────────────────────
++ obtener(clave, defecto) -&gt; Any
++ refrescar() -&gt; bool
++ iniciar() -&gt; None
++ detener() -&gt; None" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;fontFamily=Courier New;fontSize=11;" vertex="1" parent="1"><mxGeometry x="875" y="100" width="355" height="280" as="geometry"/></mxCell>
+        <mxCell id="mer_tbl" value="&lt;&lt;Tabla SQLite — MER&gt;&gt;
+config_versiones (Base propia P08)
+════════════════════════════════════
+PK  id          INTEGER AUTOINCREMENT
+UK1 app         TEXT NOT NULL (index)
+UK1 env         TEXT NOT NULL (index)
+UK1 version     INTEGER NOT NULL
+    data_json   TEXT NOT NULL (JSON)
+    autor       TEXT NOT NULL (X-Autor)
+    motivo      TEXT NOT NULL
+    creado_en   TEXT NOT NULL (UTC)
+────────────────────────────────────
+UNIQUE (app, env, version)
+INDEX ix_config_app_env (app, env, version)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;fontFamily=Courier New;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="875" y="420" width="355" height="230" as="geometry"/></mxCell>
+        <mxCell id="rel1" value="configura" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="c_set" target="c_repo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rel2" value="valida entrada PUT" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="c_pub" target="c_repo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rel3" value="1..* instancia" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="c_repo" target="c_ent"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rel4" value="persiste en (1 a N versiones)" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="c_ent" target="mer_tbl"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rel5" value="consume vía HTTP + ETag" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="c_cli" target="c_repo"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="06-actividades-uml" name="06 Actividades UML">
+    <mxGraphModel dx="1280" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="titulo" value="Diagrama UML de Actividades — Resolución de Configuración, Auditoría PUT y Polling Resiliente
+Autor: Francisco Navarro · P08 config-service (:8010)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a365d;fontColor=#ffffff;strokeColor=#0f172a;fontStyle=1;fontSize=14;align=center;" vertex="1" parent="1"><mxGeometry x="40" y="15" width="1180" height="50" as="geometry"/></mxCell>
+        <mxCell id="lane1" value="Carril 1: Cliente (ConfigClient / Operador)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="40" y="85" width="380" height="730" as="geometry"/></mxCell>
+        <mxCell id="lane2" value="Carril 2: API FastAPI (config-service :8010)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="420" y="85" width="440" height="730" as="geometry"/></mxCell>
+        <mxCell id="lane3" value="Carril 3: Almacén SQLite (config_versiones)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#334155;startSize=32;fontStyle=1;fontSize=13;" vertex="1" parent="1"><mxGeometry x="860" y="85" width="360" height="730" as="geometry"/></mxCell>
+        <mxCell id="ac_ini" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#0f172a;strokeColor=#0f172a;" vertex="1" parent="1"><mxGeometry x="215" y="130" width="30" height="30" as="geometry"/></mxCell>
+        <mxCell id="ac_req" value="Enviar petición HTTP
+(GET con If-None-Match o
+PUT con cabecera X-Autor)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="190" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_tipo" value="¿Método
+HTTP?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="580" y="180" width="120" height="75" as="geometry"/></mxCell>
+        <mxCell id="ac_get_db" value="Consultar versión en SQLite
+(actual o ?version=N)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="930" y="190" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_existe" value="¿Existe
+versión?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="580" y="290" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="ac_404" value="Responder 404
+CONFIG_NO_ENCONTRADA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="445" y="390" width="165" height="55" as="geometry"/></mxCell>
+        <mxCell id="ac_etag" value="¿If-None-Match
+== ETag "vN"?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="665" y="385" width="145" height="75" as="geometry"/></mxCell>
+        <mxCell id="ac_304" value="Responder 304 Not Modified
+(sin cuerpo, conserva caché)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="395" width="220" height="55" as="geometry"/></mxCell>
+        <mxCell id="ac_200" value="Responder 200 OK + ETag "vN"
+Recarga en caliente (Hot Reload)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="490" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_autor" value="¿X-Autor válido
+y Write-Token OK?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="570" y="510" width="145" height="80" as="geometry"/></mxCell>
+        <mxCell id="ac_422" value="Responder 422 AUTOR_VACIO
+o 401 NO_AUTORIZADO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="445" y="635" width="175" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_ins" value="Transacción atómica SQLite:
+SELECT MAX(version)+1
+INSERT fila inmutable + UTC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="925" y="515" width="230" height="75" as="geometry"/></mxCell>
+        <mxCell id="ac_201" value="Responder 201 Created
+con nuevo ETag "vN+1"" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="660" y="635" width="180" height="60" as="geometry"/></mxCell>
+        <mxCell id="ac_fallo" value="Si hay HTTPError / Timeout:
+Conservar última versión o
+defaults en caché local" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="610" width="220" height="70" as="geometry"/></mxCell>
+        <mxCell id="ac_fin" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#0f172a;strokeColor=#0f172a;strokeWidth=4;" vertex="1" parent="1"><mxGeometry x="215" y="745" width="30" height="30" as="geometry"/></mxCell>
+        <mxCell id="af1" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_ini" target="ac_req"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af2" value="HTTP" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_req" target="ac_tipo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af3" value="[GET]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_tipo" target="ac_get_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af4" value="fila / None" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_get_db" target="ac_existe"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af5" value="[No]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_existe" target="ac_404"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af6" value="[Sí]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_existe" target="ac_etag"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af7" value="[Coincide]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_etag" target="ac_304"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af8" value="[Cambió]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_etag" target="ac_200"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af9" value="[PUT / Rollback]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_tipo" target="ac_autor"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af10" value="[No]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_autor" target="ac_422"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af11" value="[Sí]" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_autor" target="ac_ins"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af12" value="vN+1" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_ins" target="ac_201"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af13" value="excepción de red" style="endArrow=block;endFill=1;dashed=1;html=1;strokeColor=#b45309;" edge="1" parent="1" source="ac_req" target="ac_fallo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af14" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_304" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af15" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_200" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af16" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_201" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af17" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_404" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af18" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_422" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="af19" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeWidth=1.5;fontSize=11;" edge="1" parent="1" source="ac_fallo" target="ac_fin"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,52 @@
+{
+  // Abrir en VS Code la carpeta services/config-service y pulsar F5.
+  // La primera vez crea .venv e instala dependencias (tarea "Preparar entorno").
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "1. Arrancar config-service (con token)",
+      "type": "debugpy",
+      "request": "launch",
+      "preLaunchTask": "Preparar entorno (.venv + dependencias)",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8010"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PISHOP_APP_ENV": "dev", "PISHOP_API_TOKEN": "pishop-dev-2026" },
+      "justMyCode": true,
+      "serverReadyAction": {
+        "pattern": "Uvicorn running on (https?://\\S+)",
+        "uriFormat": "%s/docs",
+        "action": "openExternally"
+      }
+    },
+    {
+      "name": "2. Arrancar config-service (modo publico, sin token)",
+      "type": "debugpy",
+      "request": "launch",
+      "preLaunchTask": "Preparar entorno (.venv + dependencias)",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8010"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PISHOP_APP_ENV": "dev" },
+      "justMyCode": true,
+      "serverReadyAction": {
+        "pattern": "Uvicorn running on (https?://\\S+)",
+        "uriFormat": "%s/docs",
+        "action": "openExternally"
+      }
+    },
+    {
+      "name": "3. Pruebas pytest",
+      "type": "debugpy",
+      "request": "launch",
+      "preLaunchTask": "Preparar entorno (.venv + dependencias)",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "module": "pytest",
+      "args": ["-q"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}
