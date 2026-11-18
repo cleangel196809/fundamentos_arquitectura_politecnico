@@ -27,6 +27,10 @@ pedidos-service:
     PISHOP_HTTP_PORT: "8003"
 ```
 
+### Aislamiento en el Edge (Semana 5)
+
+En la arquitectura con **Edge Server (Traefik v3)**, `pedidos-service` opera como un servicio core dentro de la red interna `pishop-net`. No publica puertos hacia el host de la máquina (`ports` se omite en producción) para bloquear peticiones externas directas. El acceso se realiza exclusivamente a través de `checkout-bff` o `api-publica`. Para más detalles técnicos, consultar [docs/arquitectura/entregable-04-edge.md](../../docs/arquitectura/entregable-04-edge.md).
+
 ---
 
 ## Variables de configuración `PISHOP_*`
