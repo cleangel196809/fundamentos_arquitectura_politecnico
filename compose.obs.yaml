@@ -1,0 +1,58 @@
+# Pila de Observabilidad para Laboratorio Semana 6 (OpenTelemetry, Prometheus, Tempo, Loki, Grafana)
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.139.0
+    container_name: pishop-otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8889:8889"   # Prometheus metrics exporter
+    networks:
+      - pishop-obs-net
+
+  tempo:
+    image: grafana/tempo:2.9.0
+    container_name: pishop-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./infra/tempo-config.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"   # Tempo HTTP
+    networks:
+      - pishop-obs-net
+
+  loki:
+    image: grafana/loki:3.6.0
+    container_name: pishop-loki
+    ports:
+      - "3100:3100"   # Loki API
+    networks:
+      - pishop-obs-net
+
+  prometheus:
+    image: prom/prometheus:v3.7.0
+    container_name: pishop-prometheus
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - pishop-obs-net
+
+  grafana:
+    image: grafana/grafana:12.3.0
+    container_name: pishop-grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - "3000:3000"   # UI de Grafana: http://localhost:3000
+    networks:
+      - pishop-obs-net
+
+networks:
+  pishop-obs-net:
+    name: pishop-obs-net

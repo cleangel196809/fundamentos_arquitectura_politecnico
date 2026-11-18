@@ -9,12 +9,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from opentelemetry import trace
+import structlog
 
 from app.bus import get_bus
 from app.database import check_db_ready, create_all, init_db
+from app.observabilidad import configurar_registros, configurar_trazas, instrumentar_aplicacion, log
 from app.publisher import OutboxPublisher
 from app.routers import outbox, pedidos
 from app.settings import get_settings
+
+configurar_registros()
+tracer = configurar_trazas("pedidos-service")
 
 settings = get_settings()
 
@@ -29,6 +35,8 @@ _publisher: OutboxPublisher | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _publisher
+
+    log.info("servicio_iniciando", service=settings.service_name, instance=INSTANCE_ID)
 
     # Initialise DB
     init_db(settings)
@@ -46,6 +54,7 @@ async def lifespan(app: FastAPI):
     ESTADO["arranco"] = False
     if _publisher:
         await _publisher.stop()
+    log.info("servicio_detenido", service=settings.service_name)
 
 
 app = FastAPI(
@@ -53,6 +62,31 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+# ── Middleware de Correlacion (X-Request-Id y W3C trace_id) ─────────────────
+@app.middleware("http")
+async def correlacion(request: Request, call_next):
+    """Propaga o genera X-Request-Id y lo enlaza al contexto structlog."""
+    cid = request.headers.get("X-Request-Id") or uuid.uuid4().hex
+
+    ctx = trace.get_current_span().get_span_context()
+    trace_id_str = format(ctx.trace_id, "032x") if ctx and ctx.trace_id else ""
+
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(
+        request_id=cid,
+        trace_id=trace_id_str,
+        service=settings.service_name,
+    )
+
+    respuesta = await call_next(request)
+    respuesta.headers["X-Request-Id"] = cid
+    return respuesta
+
+
+# ── Instrumentacion automatica OTel ──────────────────────────────────────────
+instrumentar_aplicacion(app)
 
 
 # ── Custom validation error handler ──────────────────────────────────────────

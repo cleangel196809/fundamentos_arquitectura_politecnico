@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bus import EventBus
 from app.database import get_session_factory
+from app.metricas import pedidos_pendientes_outbox
 from app.models import OutboxEvent
 from app.settings import Settings
 
@@ -88,6 +89,7 @@ class OutboxPublisher:
                         },
                     )
                     event.publicado_en = datetime.now(timezone.utc)
+                    pedidos_pendientes_outbox.add(-1, {"tipo": event.tipo})
                     published += 1
                 except Exception:
                     logger.exception("Failed to publish event %s", event.id)

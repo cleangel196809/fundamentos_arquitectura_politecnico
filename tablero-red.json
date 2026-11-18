@@ -1,0 +1,141 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Metricas RED — pedidos-service (P03)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 80, "gradientMode": "none", "lineWidth": 1 },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "title": "Rate (Tasa de Peticiones)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(pedidos_creados_total[1m]))",
+          "legendFormat": "pedidos creados / s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.05 }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "title": "Errors (Tasa de Errores)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(pedidos_cancelados_total[1m])) / (sum(rate(pedidos_creados_total[1m])) + 0.001)",
+          "legendFormat": "tasa error/cancelacion",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "title": "Duration p50 (Latencia Mediana)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(pedido_duracion_segundos_bucket[1m])) by (le))",
+          "legendFormat": "p50 (mediana)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.25 },
+              { "color": "red", "value": 0.50 }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "title": "Duration p95 (Latencia Percentil 95 - SLO)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(pedido_duracion_segundos_bucket[1m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 9 },
+      "id": 5,
+      "title": "Medidor Vivo: Eventos Pendientes en Outbox",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "pedidos_pendientes_outbox",
+          "legendFormat": "cola outbox viva",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["pishop", "pedidos", "red", "opentelemetry"],
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "PiShop Cloud — RED Dashboard (pedidos-service)",
+  "uid": "pishop-pedidos-red"
+}

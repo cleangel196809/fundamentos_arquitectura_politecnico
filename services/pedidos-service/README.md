@@ -177,6 +177,50 @@ Todos los tests usan SQLite (`sqlite+aiosqlite`) + bus en memoria sin servicios 
 
 ---
 
+## Observabilidad y Métricas RED (Semana 6)
+
+El servicio incorpora los tres pilares de observabilidad mediante **OpenTelemetry**, **structlog** y la pila Grafana (Tempo, Loki, Prometheus).
+
+### 1. Registros Estructurados (Logs en JSON)
+Todos los logs se emiten a `stdout` en formato JSON con niveles estándar (`INFO`, `WARNING`, `ERROR`).
+Cada registro incluye automáticamente el identificador de correlación `request_id` (propagado o generado desde `X-Request-Id`) y el `trace_id` de OpenTelemetry:
+
+```json
+{"event": "pedido_creado_exitosamente", "level": "info", "pedido_id": "a1b2c3d4-...", "request_id": "req-9912", "service": "pedidos-service", "timestamp": "2026-11-18T18:30:00Z", "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"}
+```
+*Conforme a la Ley 1581 de 2012 de protección de datos personales, no se registran datos personales sensibles, tokens ni datos financieros.*
+
+### 2. Trazas Distribuidas (OTLP y W3C Trace Context)
+- Propagación automática de cabeceras `traceparent` (W3C Trace Context) en llamadas entrantes y salientes con `opentelemetry-instrumentation-fastapi` y `opentelemetry-instrumentation-httpx`.
+- Tramo manual de negocio: `tracer.start_as_current_span("crear_pedido")` y `cancelar_pedido` miden el tiempo de la transacción local de base de datos y registran excepciones.
+- Exportación en segundo plano vía gRPC OTLP con `BatchSpanProcessor` hacia `otel-collector:4317` (y de allí a Grafana Tempo).
+
+### 3. Métricas Propias del Dominio (OpenTelemetry Metrics SDK)
+- **Contador (`Counter`):** `pedidos_creados_total` (unit="1", etiquetas: `canal`, `estado`).
+- **Histograma (`Histogram`):** `pedido_duracion_segundos` (unit="s", distribución de latencia para percentiles p50 y p95).
+- **Medidor (`UpDownCounter`):** `pedidos_pendientes_outbox` (unit="1", seguimiento en tiempo real de eventos no publicados en la tabla `outbox_events`).
+
+### 4. Definición de SLI, SLO y Presupuesto de Error
+
+| Concepto | Definición para `pedidos-service` | Métrica / Fórmula |
+|---|---|---|
+| **SLI (Service Level Indicator)** | Proporción de peticiones exitosas de creación de pedido atendidas en menos de 300 ms | $\frac{\text{Peticiones HTTP 201 con latencia} \le 300\text{ms}}{\text{Total de peticiones válidas}} \times 100$ |
+| **SLO (Service Level Objective)** | 99.5 % de disponibilidad y rendimiento conforme en una ventana móvil de 30 días | **99.5 %** |
+| **Presupuesto de Error (Error Budget)** | Margen de fallo admisible antes de congelar despliegues | **0.5 %** del tráfico mensual ($\approx 3.65$ horas de degradación/mes) |
+
+### 5. Pila de Observabilidad y Tablero RED
+- Se incluye `compose.obs.yaml` para desplegar la pila:
+  ```bash
+  docker compose -f compose.obs.yaml up -d
+  ```
+- Grafana accesible en `http://localhost:3000` con el tablero importable `tablero-red.json` con los 4 paneles RED:
+  1. **Rate:** `sum(rate(pedidos_creados_total[1m]))`
+  2. **Errors:** Tasa de cancelación / errores
+  3. **Duration p50:** `histogram_quantile(0.50, ...)`
+  4. **Duration p95:** `histogram_quantile(0.95, ...)` (Monitoreo de cumplimiento del SLO)
+
+---
+
 ## Declaración de uso de IA generativa
 
 - **Herramienta utilizada**: Asistente de IA (Antigravity / LLM).
