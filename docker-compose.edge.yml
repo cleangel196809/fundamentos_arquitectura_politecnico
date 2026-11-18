@@ -1,0 +1,55 @@
+# Docker Compose para el Reto 5.1 y Entregable 4: Edge Server Traefik v3 + Aislamiento Core
+services:
+  edge:
+    image: traefik:v3.6
+    container_name: pishop-edge
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=pishop-net"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"        # Entrada HTTP única pública
+      - "8080:8080"    # Traefik Dashboard para monitoreo
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - pishop-net
+
+  pedidos-service:
+    build: ./services/pedidos-service
+    container_name: pishop-pedidos
+    environment:
+      PISHOP_SERVICE_NAME: "pedidos-service"
+      PISHOP_HTTP_PORT: "8003"
+      PISHOP_APP_ENV: "dev"
+      PISHOP_EVENT_BUS: "memory"
+    # IMPORTANTE: NO se expone 'ports' hacia el host de la máquina (Regla de oro de la Semana 5).
+    # Solo es alcanzable internamente por el BFF y otros contenedores en 'pishop-net'.
+    networks:
+      - pishop-net
+
+  checkout-bff:
+    build: ./services/checkout-bff
+    container_name: pishop-bff
+    environment:
+      PISHOP_SERVICE_NAME: "checkout-bff"
+      PISHOP_HTTP_PORT: "8080"
+    networks:
+      - pishop-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bff.rule=Host(`api.pishop.co`) && PathPrefix(`/v1/checkout`, `/v2/checkout`)"
+      - "traefik.http.routers.bff.entrypoints=web"
+      - "traefik.http.services.bff.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.rl-tienda.ratelimit.average=50"
+      - "traefik.http.middlewares.rl-tienda.ratelimit.burst=100"
+      - "traefik.http.routers.bff.middlewares=rl-tienda@docker"
+
+networks:
+  pishop-net:
+    name: pishop-net

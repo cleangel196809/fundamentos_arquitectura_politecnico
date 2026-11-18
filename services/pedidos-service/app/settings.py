@@ -1,24 +1,35 @@
-"""Configuración externalizada (Twelve-Factor, factor III).
-
-Ningún valor de entorno, dirección o secreto debe estar escrito en el código
-de negocio. Todo entra por variables de entorno con prefijo PISHOP_.
-"""
 from pydantic import HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PISHOP_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="PISHOP_",
+        env_file=".env",
+        extra="ignore",
+    )
 
-    service_name: str = "plantilla-servicio"
-    http_port: int = 8001
+    service_name: str = "pedidos-service"
+    http_port: int = 8003
     app_env: str = "dev"
-    database_url: str = "sqlite+aiosqlite:///./local.db"   # en compose: postgresql+asyncpg://...
+
+    # Database
+    database_url: str = "sqlite+aiosqlite:///./pedidos.db"
     database_password: SecretStr = SecretStr("cambiar-en-entorno")
+
+    # Event bus
+    event_bus: str = "memory"           # "memory" or "redis"
+    redis_url: str = "redis://localhost:6379"
+
+    # Publisher
+    publish_interval_seconds: float = 5.0
+
+    # External services
     config_service_url: HttpUrl = "http://localhost:8010"
     consul_url: HttpUrl = "http://localhost:8500"
-    config_poll_seconds: int = 15
-    http_timeout_seconds: float = 2.0     # timeout explícito (semana 3)
+
+    # HTTP client
+    http_timeout_seconds: float = 2.0
 
 
 def get_settings() -> Settings:
